@@ -4,10 +4,8 @@
 // View has no form field in it. Local is ticked and disabled. To client is unticked every time, and disabled until the project
 // has a client folder (Settings). The words are the spec's (docs/handoff/design-43-to-client.md).
 import { useEffect, useRef } from "preact/hooks";
-import { data, project, rows, openWork } from "../stores/report.js";
-import { todayIso } from "../workItems.js";
-import { groups, showState, ANYWAY } from "./publishCheck.js";
-import { dialog, latest, NO_FOLDER, folderName, open, close, tick, pick, rename, confirmOverwrite, ready, cancel, go, refreshLatest } from "./publishState.js";
+import { data, project } from "../stores/report.js";
+import { dialog, latest, NO_FOLDER, folderName, open, tick, pick, rename, confirmOverwrite, ready, cancel, go, refreshLatest } from "./publishState.js";
 
 const shownDate = (iso) => (/^\d{4}-\d\d-\d\d$/.test(iso) ? iso.slice(8) + "-" + iso.slice(5, 7) + "-" + iso.slice(0, 4) : iso);
 export const lastLine = (l) => (l ? `Published ${shownDate(l.at)} ${l.to_client ? "to the client" : "locally"}` : "");
@@ -34,8 +32,6 @@ function Dialog() {
   }, [s.phase, s.phase === "clash" ? s.choice : ""]);
   const working = s.phase === "working", clash = s.clash;
   const stateWords = lastLine(latest.value);
-  const stale = ["choose", "working", "error"].includes(s.phase) ? groups(rows.value, todayIso()) : [];
-  const showThem = (g) => { if (working) return; close(); openWork(showState(g.value)); };      // the dialog goes, Work items opens on exactly those
   return (
     <dialog id="publish-dialog" class="dlg" aria-labelledby="pub-title" ref={el} onCancel={(e) => { e.preventDefault(); cancel(); }}>
       <form class="dlg-form" onSubmit={(e) => { e.preventDefault(); go(); }}>
@@ -43,17 +39,6 @@ function Dialog() {
         {s.phase === "clash" ? null : (
           <p class="muted dlg-sub">{p ? p.name : project.value}{p && p.week_ending ? ` · week ending ${shownDate(p.week_ending)}` : ""}{stateWords ? ` · ${stateWords}` : ""}</p>
         )}
-        {stale.length ? (
-          <div class="pub-fresh" id="pub-fresh">
-            {stale.map((g) => (
-              <p class="pub-fresh-row" key={g.value} data-fresh={g.value}>
-                <span>{g.text}</span>
-                <button type="button" class="link" data-show={g.value} aria-label={g.label} disabled={working} onClick={() => showThem(g)}>Show them</button>
-              </p>
-            ))}
-            <p class="muted pub-fresh-note">{ANYWAY}</p>
-          </div>
-        ) : null}
         {s.phase === "clash" ? (
           <fieldset class="pub-clash">
             <legend class="sr-only">What should clark do?</legend>
