@@ -28,8 +28,8 @@ export function words(r, what) {
   const b = r.body;
   if (KNOWN.includes(r.status) && b && typeof b.code === "string" && /^[a-z_]+$/.test(b.code) && typeof b.message === "string" && b.message) return b.message;
   if (r.status === 0 || r.status === 403) return plain(r.status, b);
-  if (r.status === 503) return `clark could not ${what} just now. Wait a moment and try again.`;
-  return `clark hit a problem while it was working. ${what === "publish" ? "Some of the report may have been saved: check the folders before you publish again." : "Nothing was changed."} If it happens again, restart clark.`;
+  if (r.status === 503) return `Could not ${what} just now. Wait a moment and try again.`;
+  return `Something went wrong while this was working. ${what === "publish" ? "Some of the report may have been saved: check the folders before you publish again." : "Nothing was changed."} If it happens again, restart clark.`;
 }
 
 // The workbook (#147): {status, body, blob, name}. A download is a file, so the answer is read as a file when it is one and as

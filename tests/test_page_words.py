@@ -241,6 +241,17 @@ class Words(unittest.TestCase):
             self.assertNotIn("Clark", text, f.name)
             self.assertIsNone(re.search(r"\bJSON\b(?!\.)", re.sub(r"//.*", "", text)) if f.suffix == ".jsx" else None, f.name)
 
+    def test_no_sentence_in_the_edit_screens_starts_with_the_product_name(self):
+        """A screen sentence does not start with the product name (the rule set in #170): the strings in the edit screens' code."""
+        starts = re.compile(r"""[`"'>]\s*clark\s+[a-z]""", re.I)   # a word after it: an event name like "clark:open" is not a sentence
+        files = sorted(PAGE_SRC.glob("edit/**/*.js")) + sorted(PAGE_SRC.glob("edit/**/*.jsx"))
+        self.assertTrue(files)
+        for f in files:
+            for n, line in enumerate(f.read_text(encoding="utf-8").splitlines(), 1):
+                if line.lstrip().startswith("//"):
+                    continue
+                self.assertIsNone(starts.search(line), f"{f.name}:{n}: a sentence starts with the product name")
+
     def test_help_names_no_version_that_may_not_exist(self):
         """#209: the Update entry shows the button as Review X.Y.Z, not a real-looking version."""
         for path in (PAGE_SRC / "help" / "helpContent.json", PAGE_SRC.parents[3] / "system" / "prototype" / "help.js"):
