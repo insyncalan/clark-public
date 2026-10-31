@@ -11,6 +11,9 @@ import { build, moveFor, dateMove, movedWords, boardGroup, isCollapsed, toggleCo
 import { createDrag } from "../logic/dragCore.js";
 import { Menu, MenuPanel } from "../components/Menu.jsx";
 import { Icon } from "../components/Icon.jsx";
+import { GroupTick } from "../components/SelectBar.jsx";
+import { workSelection as pickSel } from "../stores/selection.js";
+import { ownClick, noTextRange, pickClick, pickOpen, pickKeys } from "../components/pick.js";
 
 const TONED = ["status", "due", "priority"];             // the groups whose columns carry their state's colour
 const LANE_WORDS = { workstream: "Workstream", type: "Type" };
@@ -27,14 +30,25 @@ function Eye() {
   return <span class="eye" title="Shown to the client"><Icon name="eye" /><span class="sr">Shown to the client</span></span>;
 }
 
-function Card({ card, editing, selected, dragging, ask, menu, onOpen, onMenu, children }) {
-  const label = `${card.id} ${card.title}, ${card.state.text}${card.due.words ? ", " + card.due.words.toLowerCase() : ""}`;
+// A card is picked like a table row (#195): a click selects it, Cmd or Ctrl+click adds or removes it, Shift+click a range in the
+// order drawn, a double click (or Enter) opens the peek; Space adds or removes it, Shift+Up and Shift+Down extend, Cmd or Ctrl+A
+// selects every card shown.
+function Card({ card, editing, selected, picked, dragging, ask, menu, onOpen, onPick, onMenu, children }) {
+  const label = `${card.id} ${card.title}, ${card.state.text}${card.due.words ? ", " + card.due.words.toLowerCase() : ""}${picked ? ", selected" : ""}`;
+  const focusCard = (id) => { const el = document.querySelector(`article[data-id="${CSS.escape(id)}"] .bc-main`); if (el) el.focus(); };
   return (
-    <article class={`bcard k-${card.typeClass.slice(2)}${selected ? " sel" : ""}${dragging ? " drag" : ""}${card.open ? "" : " done"}`} data-id={card.id} data-kind={card.typeClass.slice(2)}>
-      <div class="bc-main" role="button" tabIndex={0} aria-label={label} onClick={() => onOpen(card.id)}
-        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(card.id); } }}>
+    <article class={`bcard k-${card.typeClass.slice(2)}${selected ? " sel" : ""}${picked ? " picked" : ""}${dragging ? " drag" : ""}${card.open ? "" : " done"}`} data-id={card.id} data-kind={card.typeClass.slice(2)}>
+      <div class="bc-main" role="button" tabIndex={0} aria-label={label} onMouseDown={noTextRange}
+        onClick={(e) => { if (ownClick(e.target, e.currentTarget)) onPick(e, card.id); }}
+        onDblClick={(e) => { if (ownClick(e.target, e.currentTarget)) onOpen(card.id, true); }}
+        onFocus={() => pickSel.moveCursor(card.id)}
+        onKeyDown={(e) => {
+          if (e.target !== e.currentTarget) return;
+          if (e.key === "Enter" && !e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); onOpen(card.id); return; }
+          pickKeys(e, card.id, focusCard);
+        }}>
         <div class="bc-top"><span class={`type ${card.typeClass}`}>{card.type}</span><span class="bc-id num">{card.id}</span>{card.client ? <Eye /> : null}</div>
-        <div class="bc-title">{card.title}</div>
+        <div class="bc-title">{picked ? <span class="tick" aria-hidden="true"><Icon name="check" /></span> : null}{card.title}</div>
         <div class="bc-foot">
           {card.initials ? <span class="av" title={card.owner} aria-hidden="true">{card.initials}</span> : null}
           {card.due.words ? <span class={`due-l${card.due.tone ? " " + card.due.tone : ""}`}>{card.due.words}</span> : null}
@@ -198,7 +212,9 @@ export function Board({ rows, today, type }) {
   };
   // If the board goes away mid-drag (another project opened with the button held), take the listeners and the scroll off.
   useEffect(() => () => { if (listening.current) listening.current(); if (frame.current) cancelAnimationFrame(frame.current); }, []);
-  const open = (id) => { if (performance.now() - endedAt.current < 400) return; openCard(id); };
+  const open = (id, dbl) => { if (performance.now() - endedAt.current < 400) return; if (dbl) pickOpen(id, openCard); else openCard(id); };
+  const pick = (e, id) => { if (performance.now() - endedAt.current < 400) return; pickClick(e, id, openCard); };
+  const picked = pickSel.ids.value;
 
   // Full screen (#81): a class on the body, so a redraw after a move keeps it. Esc leaves it unless a menu, a date picker or the
   // peek is open (the peek's root carries data-peek, for #42): those take their own Esc first.
@@ -269,8 +285,8 @@ export function Board({ rows, today, type }) {
     const here = cardCell[cd.id];
     return (
       <div key={cd.id} class="bwrap" onPointerDown={(e) => startDrag(e, cd.id, ln.key, c.key)}>
-        <Card card={cd} editing={editing} selected={peeked === cd.id} dragging={dragId === cd.id} menu={menu === cd.id}
-          onOpen={open} onMenu={(id) => setMenu(menu === id ? null : id)}
+        <Card card={cd} editing={editing} selected={peeked === cd.id} picked={picked.includes(cd.id)} dragging={dragId === cd.id} menu={menu === cd.id}
+          onOpen={open} onPick={pick} onMenu={(id) => setMenu(menu === id ? null : id)}
           ask={ask && ask.id === cd.id
             ? ask.kind === "date"
               ? <DatePicker ask={ask} today={today} onCancel={() => setAsk(null)} onSet={(date) => {
@@ -317,6 +333,7 @@ export function Board({ rows, today, type }) {
                   <section class={`col${shut ? " shut" : ""}${tone}${over === key ? " over" : ""}${c.nodrop ? " nodrop" : ""}`} key={c.key}
                     data-cell="1" data-col={c.key} data-lane={ln.key == null ? "" : ln.key} data-count={c.count} aria-label={`${c.label}, ${c.count}`} aria-disabled={c.nodrop ? "true" : undefined}>
                     <h4 class="col-h">
+                      <GroupTick ids={c.cards.map((cd) => cd.id)} label={b.lane ? `${c.label} in ${ln.label || "No " + LANE_WORDS[b.lane].toLowerCase()}` : c.label} shut={shut || c.cards.length === 0} />
                       <button type="button" class="col-b" aria-expanded={shut ? "false" : "true"} aria-label={`${c.label}, ${c.count}${shut ? ", collapsed" : ""}`} data-toggle={c.key}
                         onClick={() => setWork(toggleCollapsed(work.value, g, c.key))}>
                         <span class="dot" aria-hidden="true"></span><span class="cl">{c.label}</span><span class="cn num">{c.count}</span>

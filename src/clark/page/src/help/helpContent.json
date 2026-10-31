@@ -339,7 +339,7 @@
     "w": "Any work item: a row, a card or its ID",
     "go": "work",
     "s": [
-     "Click a row, a card or an ID. The item opens in the **peek** at the right, and the page stays where it was.",
+     "Double-click a row or a card, press [[Enter]] on it, or click an ID. The item opens in the **peek** at the right, and the page stays where it was. A single click selects the row or card instead.",
      "Click the title to change it. [[Enter]] keeps it; [[Esc]] puts it back.",
      "Under the title are **Status**, **Priority**, **Owner** and **Due**. Click one to choose another value. A risk’s or issue’s status menu also sets its colour (Red, Amber or Green), which sets its priority. The due date offers Today, Tomorrow, Friday, Next week and No date.",
      "A warning shows when an action is overdue or due on a weekend, with one-click fixes such as **Move to Friday**.",
@@ -1680,6 +1680,42 @@
    [
     "Double-click",
     "On the left edge of the peek or ask clark: back to the usual width"
+   ],
+   [
+    "Click",
+    "Work items: select one row or card. A double-click opens the item"
+   ],
+   [
+    "[[Mod]]+click",
+    "Work items: add a row or card to the selection, or take it out"
+   ],
+   [
+    "[[Shift]]+click",
+    "Work items: select every row from the last one you clicked to this one, in the order on screen. On the board the order runs lane by lane, then column by column, then down each column"
+   ],
+   [
+    "[[Mod+Shift]]+click",
+    "Work items: add that run of rows or cards to what is already selected"
+   ],
+   [
+    "[[Shift+Up]] [[Shift+Down]]",
+    "Work items, on a row or card: select the next one up or down as well"
+   ],
+   [
+    "[[Space]]",
+    "Work items, on a row or card: select it, or take it out of the selection"
+   ],
+   [
+    "[[Mod+A]]",
+    "Work items, on a row or card: select every one shown"
+   ],
+   [
+    "The tick box on a group",
+    "Work items: select or clear every row in that group. It is off while the group is closed"
+   ],
+   [
+    "[[Esc]] with a selection",
+    "Work items, with no menu or box open: clear the selection"
    ]
   ],
   "icons": [

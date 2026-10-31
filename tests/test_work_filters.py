@@ -108,6 +108,15 @@ def click(cdp, sid, selector):
     cdp.call("Input.dispatchMouseEvent", {"type": "mouseReleased", "x": x, "y": y, "button": "left", "buttons": 0, "clickCount": 1}, sid)
 
 
+def dblclick(cdp, sid, selector):
+    """A real double click: two presses, the second with a click count of 2 (#195: a single click on a row selects it)."""
+    x, y = where(cdp, sid, selector)
+    cdp.call("Input.dispatchMouseEvent", {"type": "mouseMoved", "x": x, "y": y}, sid)
+    for n in (1, 2):
+        cdp.call("Input.dispatchMouseEvent", {"type": "mousePressed", "x": x, "y": y, "button": "left", "buttons": 1, "clickCount": n}, sid)
+        cdp.call("Input.dispatchMouseEvent", {"type": "mouseReleased", "x": x, "y": y, "button": "left", "buttons": 0, "clickCount": n}, sid)
+
+
 def need_chrome():
     assert Path(CHROME).is_file(), f"Google Chrome is needed for the required browser tests ({CHROME}); set CLARK_CHROME"
 
