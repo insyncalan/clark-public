@@ -289,21 +289,53 @@ def load_state(state_path, path):
     return found if found is not None else {}
 
 
-def prune_hash_records(state_path, today, keep_days=30):
+KEEP_NEWEST = 10          # the most bytes-keyed ("sha256:") records kept for one project (#181); the oldest go first
+KEEP_TOTAL = 30           # and the most the state file holds in all, newest first, plus each project's newest (never cut), so more than 30 live projects keep more than 30 (#181)
+
+
+def prune_hash_records(state_path, today, keep_days=30, keep_newest=KEEP_NEWEST, live=None, keep_total=KEEP_TOTAL, keep=None):
     """Remove the bytes-keyed ("sha256:") records exported more than keep_days before `today`, so the state file does not grow for
     ever (each holds a copy of every row). Path-keyed records are left alone. #147. A record is aged by its export date only, on
     purpose: an import never writes to the bytes-keyed record (mark_imported writes under the workbook's path, which is kept),
     so the export date is the only date it has. Nor does an import need it afterwards: mark_imported copies the record it found
     by the bytes, with the export in it ("hash", "rows"), under that path, so dropping the bytes-keyed one loses nothing for a
     file that was imported. A file still byte for byte the export, kept unimported for over keep_days, then imports as
-    unrecorded: every difference is staged for the person to check, and nothing is lost."""
+    unrecorded: every difference is staged for the person to check, and nothing is lost. #181: also, no project keeps more than
+    `keep_newest` of them (the newest by export time), at most `keep_total` stay in all (plus each project's newest, which the total never cuts: with more than `keep_total` live projects the file holds one per project and no more than ten of each), and, when `live` (a set of project codes) is
+    given, none of a project outside it (an archived or removed one keeps no snapshot at all). The age rule is not the only brake on
+    the file's size; an older export then imports as unrecorded, which stages every difference for checking (fails safe).
+    `keep` is the record just written: the caps never cut it, and nor does each project's newest, so the total cap cannot take
+    the snapshot a person has just made. An export date after today (a clock set back) ranks at the start of today, below every real export made today."""
     state_path = Path(state_path)
     with STATE_LOCK:
         if not state_path.exists():
             return
         whole = json.loads(state_path.read_text(encoding="utf-8"))
         books, cutoff = whole.get("workbooks", {}), str(date.fromisoformat(str(today)[:10]) - timedelta(days=keep_days))
+        now = str(today)[:10]
         old = [k for k, v in books.items() if k.startswith("sha256:") and str(v.get("exported_at") or "9")[:10] < cutoff]
+        # #181: none of a project that is not live; no more than `keep_newest` for any one project; no more than `keep_total` in all.
+        # Newest by export time, then by the order they were saved in (two exports in one second), so the same records go every time: a hundred exports in one day must not make a state
+        # file of a hundred copies of every row.
+        left = {}
+        for at, (k, v) in enumerate(books.items()):                  # `at` is the order they were saved in: the tie-break for two in one second
+            if k.startswith("sha256:") and k not in old:
+                if live is not None and v.get("project") not in live:
+                    old.append(k)
+                else:
+                    when = str(v.get("exported_at") or "")
+                    left.setdefault(str(v.get("project") or ""), []).append((min(when, now + " 00:00:00"), at, k))     # a future date ranks at the start of today
+        must = {keep} if keep else set()
+        kept, capped = [], []
+        for mine in left.values():
+            mine.sort(reverse=True)
+            must.add(mine[0][2])                                     # each project's newest is exempt from the total cap
+            kept += mine[:max(keep_newest, 1)]
+            capped += [k for _, _, k in mine[max(keep_newest, 1):]]
+        if keep_total and len(kept) > max(keep_total, 1):
+            kept.sort(reverse=True)
+            capped += [k for _, _, k in kept[max(keep_total, 1):]]
+        old += [k for k in capped if k not in must]
         if old:
             for k in old:
                 del books[k]
@@ -316,6 +348,8 @@ def save_state(state_path, path, record):
     state_path = Path(state_path)
     with STATE_LOCK:
         whole = json.loads(state_path.read_text(encoding="utf-8")) if state_path.exists() else {}
+        if whole.get("workbooks", {}).get(_key(path)) == record:
+            return                                                    # #181: the same record again (the same bytes): nothing to write
         whole.setdefault("workbooks", {})[_key(path)] = record
         state_path.parent.mkdir(parents=True, exist_ok=True)
         platform.write_file(state_path, json.dumps(whole, indent=1, ensure_ascii=False))

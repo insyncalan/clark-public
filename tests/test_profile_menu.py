@@ -139,6 +139,25 @@ class ProfileMenu(Base):
             self.assertEqual((self.rig.everything_written(), self.rig.rows()), (before + ["clark-data/excel-export-state.json"], []),
                              "no workbook in any folder; only the export's record, beside the database")
 
+    def test_C_a_second_click_while_an_export_runs_does_nothing(self):
+        with chrome() as cdp:
+            p = self.page(cdp)
+            p.js("window.__dl = []; window.__asked = 0; URL.createObjectURL = function(b){ return 'blob:none'; };"
+                 " HTMLAnchorElement.prototype.click = function(){ window.__dl.push(this.download); };"
+                 " var real = window.fetch; window.fetch = function(u, o){ if (String(u).indexOf('/api/export') >= 0) { window.__asked++;"
+                 " return new Promise(function(done){ window.__release = function(){ done(real(u, o)); }; }); } return real(u, o); }")
+            self.pick(p, "export")
+            self.pick(p, "export")
+            self.pick(p, "export")
+            self.assertEqual(p.js("window.__asked"), 1, "the second and third clicks were ignored while the first export ran")
+            p.js("window.__release()")                                                  # the export is let go by hand: no timing
+            p.until("window.__dl.length >= 1", "the export finished")
+            self.assertEqual((p.js("window.__asked"), p.js("window.__dl.length")), (1, 1), "one export, one download")
+            self.pick(p, "export")                                                      # and after it finished, the next click works
+            p.until("window.__asked === 2", "a second export was asked for")
+            p.js("window.__release()")
+            p.until("window.__dl.length === 2", "a second export after the first")
+
     def test_C_an_export_that_is_refused_says_what_to_do(self):
         with chrome() as cdp:
             p = self.page(cdp)

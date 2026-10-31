@@ -51,8 +51,14 @@ export async function preview() {
   say("problem", r && r.status === 200 ? "The preview could not be opened. Allow pop-ups for this page, then try again." : words(r, "preview"));
 }
 
+const exporting = new Set();                         // one export at a time for a project: a second click on it while one runs does nothing (#181)
+
 export async function exportExcel() {
-  const r = await exportRequest(project.value);
+  const code = project.value;
+  if (exporting.has(code)) return;
+  exporting.add(code);
+  let r;
+  try { r = await exportRequest(code); } finally { exporting.delete(code); }
   if (r.status !== 200 || !r.blob) {
     say("problem", isAnswer(r) && [400, 404, 409].includes(r.status) ? r.body.message : words(r, "export"));
     return;
