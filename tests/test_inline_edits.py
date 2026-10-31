@@ -672,7 +672,7 @@ class Live(unittest.TestCase):
             self.until(cdp, sid, "clarkPage.project() === 'OTH'", "another project is open")
             self.until(cdp, sid, "(document.querySelector('.toast-text') || {}).textContent === 'Priority of TUL-A-001 is back to Urgent.'", "the undo said what went back, and nothing more")
             self.assertEqual(self.row("actions", "TUL-A-001")["priority"], "Urgent", "it was undone")
-            self.assertNotIn("could not be read again", self.toast(cdp, sid))
+            self.assertNotIn("could not be refreshed", self.toast(cdp, sid))
             self.assertFalse(cdp.js("!!document.querySelector('.toast.problem')", sid), "no problem is said")
 
     def test_a_refusal_is_said_in_the_pages_words(self):

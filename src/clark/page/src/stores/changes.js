@@ -47,7 +47,7 @@ function redraw(code, reply) {
 // when it could not be read; true when it was, or when the person has opened another project meanwhile (nothing is wrong then).
 async function readAgain(code, what) {
   if (await reread(code) || project.value !== code) return true;
-  say("problem", `${what}, but the page could not be read again. Reload the page to see it.`);
+  say("problem", `${what}, but the page could not be refreshed. Reload the page to see it.`);
   return false;
 }
 

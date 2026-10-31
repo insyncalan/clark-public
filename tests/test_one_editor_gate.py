@@ -289,7 +289,7 @@ class PageGate(unittest.TestCase):
             js("document.querySelector('.ProseMirror').cxed.editor.commands.insertContent('Added words. '); true")
             self.key(cdp, sid, "Enter", "Enter", 13, self.mod(js))
             self.assertTrue(wait(lambda: js("(document.querySelector('.toast-text') || {}).textContent || ''").endswith("Reload the page to see it."), 10))
-            self.assertIn("could not be read again", js("document.querySelector('.toast-text').textContent"))
+            self.assertIn("could not be refreshed", js("document.querySelector('.toast-text').textContent"))
             shown = js("document.querySelector('[data-rich]').textContent")
             self.assertIn("Original words", shown, "the reply carried no body, so the section kept the one the page had")
             self.assertNotIn("Click to write", shown)
