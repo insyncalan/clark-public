@@ -9,6 +9,7 @@ should not run while the computer sleeps, so waking up should not stop it either
 docs/handoff/design-71-launcher.md. creaite live_server.watch_for_close, BL-86.)
 Standard library only, Python 3.9.
 """
+import math
 import time
 
 STOP_AFTER = 60.0           # seconds without a "still here" before a launcher-started server stops
@@ -17,12 +18,17 @@ HEARTBEAT = 10              # seconds between an open page's "still here" (the p
 
 
 def number(environ, name, default):
-    """A positive number from the environment (the tests shorten them), else `default`."""
+    """A positive, finite number from the environment (the tests shorten them), else `default` itself."""
+    raw = environ.get(name)
+    if not raw:
+        return default
     try:
-        value = float(environ.get(name) or default)
+        value = float(raw)
     except ValueError:
         return default
-    return value if value > 0 else default
+    if not math.isfinite(value) or value <= 0:
+        return default
+    return value
 
 
 def launched(environ):

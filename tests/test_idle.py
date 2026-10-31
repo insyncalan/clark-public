@@ -115,6 +115,15 @@ class Environment(unittest.TestCase):
             if expected:
                 self.assertEqual((i.stop_after, i.check), expected, bad)
 
+    def test_number_refuses_non_finite_values(self):
+        default = object()
+        for bad in ("inf", "-inf", "nan", "1e999", "0", "-5", "abc", ""):
+            self.assertIs(idle.number({"X": bad}, "X", default), default, bad)
+        self.assertIs(idle.number({}, "X", default), default, "a missing name")
+        self.assertEqual(idle.number({"X": "2.5"}, "X", default), 2.5)
+        self.assertEqual(idle.number({"X": "90"}, "X", default), 90.0)
+        self.assertEqual(idle.number({"X": "0.1"}, "X", default), 0.1)
+
 
 class ForReal(unittest.TestCase):
     def test_a_watcher_stops_a_server_after_its_page_goes_and_not_before(self):
