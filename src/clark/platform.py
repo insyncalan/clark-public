@@ -12,10 +12,14 @@ import getpass
 import os
 import re
 import secrets
+import select
 import shutil
+import signal
 import stat
 import subprocess
 import sys
+import tempfile
+import threading
 import time
 from pathlib import Path
 
@@ -489,3 +493,131 @@ def find_claude(which=shutil.which):
         raise PlatformError("The copy of Claude Code on this computer can't be used safely by ask clark. Install Claude "
                             "Code's own app (claude.exe), then start clark again.")
     return found or None
+
+
+STOP_WAIT = 2.0          # seconds between the polite stop and the kill of a run_stoppable group
+
+
+def _end_group(proc):
+    """End `proc`'s whole process group: a polite stop, a short wait, then a kill. The program was started in a new session, so
+    its group's id is its own pid, which still names the group after the leader itself has gone. Safe to call twice."""
+    for sig in (signal.SIGTERM, signal.SIGKILL):
+        try:
+            os.killpg(proc.pid, sig)
+        except (ProcessLookupError, PermissionError, OSError):
+            return                              # no one is left in the group
+        try:
+            proc.wait(timeout=STOP_WAIT)
+        except subprocess.TimeoutExpired:
+            continue
+        if sig == signal.SIGTERM:
+            time.sleep(0.05)                    # a helper may outlive its leader by a moment; the kill that follows catches it
+
+
+def _scratch_parent():
+    """The folder run_stoppable makes its empty working folder in: the system's temporary folder, unless TMPDIR put that inside clark's
+    own data folder (a working folder must never be there: the program could then see clark's database and backups through `..`), when
+    it is /tmp."""
+    parent = Path(tempfile.gettempdir()).resolve()
+    try:
+        mine = data_dir().resolve()
+    except (OSError, RuntimeError, NotBuiltYet):
+        return str(parent)
+    if parent == mine or mine in parent.parents or parent in mine.parents:
+        return "/tmp"
+    return str(parent)
+
+
+def run_stoppable(args, data, env, limit, max_out, stop=None, prefix="clark-run-", tmp_names=("TMPDIR",)):
+    """Run one program from an argument list (never a shell) as the leader of its own process group, in a new empty folder of its
+    own (removed afterwards), with exactly `env` as its environment, `data` on standard input, and read at most `max_out` bytes
+    of standard output within `limit` seconds. `stop` (a threading.Event) ends it early. Returns (status, out, code): status is
+    "ok" (exit code 0), "failed" (any other code, or it could not start), "slow", "too_much" or "stopped"; `out` is empty unless
+    the program finished. Standard error is thrown away (it could hold what it was given). Whatever ends the run, the whole
+    group is ended (anything the program started goes too). Each name in `tmp_names` is set in the program's environment to a
+    second new folder of its own (0700, removed afterwards), so its temporary files are never shared with another run. Standard
+    input reaches its end as soon as `data` is written; it is fed through a pipe end of clark's own that never blocks, so a
+    program (or a helper) that holds standard input open without reading it can never hold this function up. Used by ask
+    clark's provider (#47c); never raises for the program's own faults.
+    Known limit: a helper that leaves the group (its own setsid) is not ended with it; it keeps only the pipes, which this
+    function stops using when the run ends."""
+    parent = _scratch_parent()
+    work = tempfile.mkdtemp(prefix=prefix, dir=parent)
+    tmp, proc, feeder = None, None, None
+    try:
+        tmp = tempfile.mkdtemp(prefix=prefix + "tmp-", dir=parent)
+        env = dict(env)
+        env.update({name: tmp for name in tmp_names})
+        r, w = os.pipe()
+        try:
+            # close_fds and no pass_fds: only 0, 1 and 2 reach the program (nothing clark holds open); umask 077: what it writes is
+            # the person's alone
+            proc = subprocess.Popen(list(args), stdin=r, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, cwd=work,
+                                    env=env, close_fds=True, pass_fds=(), start_new_session=True, shell=False, umask=0o077)
+        except (OSError, ValueError, subprocess.SubprocessError):
+            os.close(w)
+            return "failed", b"", None
+        finally:
+            os.close(r)
+        os.set_blocking(w, False)
+
+        def feed():
+            view, sent = memoryview(data), 0
+            try:
+                while sent < len(view) and not fed.is_set():
+                    _r, ready, _x = select.select([], [w], [], 0.2)
+                    if ready:
+                        try:
+                            sent += os.write(w, view[sent:sent + 65536])
+                        except BlockingIOError:
+                            pass
+            except (OSError, ValueError):
+                pass                            # the program closed its end: nothing more to give it
+            finally:
+                os.close(w)                     # the end of standard input
+        fed = threading.Event()                 # set when the run is over: the feeder gives up at once
+        feeder = threading.Thread(target=feed, daemon=True)
+        feeder.start()
+        deadline, out, status = time.monotonic() + limit, bytearray(), None
+        fd = proc.stdout.fileno()
+        while status is None:
+            if stop is not None and stop.is_set():
+                status = "stopped"
+                break
+            left = deadline - time.monotonic()
+            if left <= 0:
+                status = "slow"
+                break
+            ready, _w, _x = select.select([fd], [], [], min(0.2, left))
+            if not ready:
+                continue
+            chunk = os.read(fd, 65536)
+            if not chunk:
+                break
+            out += chunk
+            if len(out) > max_out:
+                status = "too_much"
+        if status is None:
+            try:
+                code = proc.wait(timeout=max(0.1, deadline - time.monotonic()))
+            except subprocess.TimeoutExpired:
+                status = "slow"
+            else:
+                _end_group(proc)                # helpers it left behind in its group go too
+                return ("ok" if code == 0 else "failed"), bytes(out), code
+        _end_group(proc)
+        return status, b"", proc.returncode
+    finally:
+        if feeder is not None:
+            fed.set()
+            feeder.join(STOP_WAIT)
+        if proc is not None:
+            if proc.poll() is None:
+                _end_group(proc)
+            try:
+                proc.stdout.close()
+            except (OSError, ValueError, AttributeError):
+                pass
+        shutil.rmtree(work, ignore_errors=True)
+        if tmp is not None:
+            shutil.rmtree(tmp, ignore_errors=True)
