@@ -421,7 +421,7 @@ class InProcess(TempFolder):
         code, out, err, serve = self.run_main("--port", "8123")
         self.assertEqual((code, err), (0, ""))
         (call,) = serve.calls
-        self.assertEqual(sorted(call), ["change", "data_for", "err", "movement", "out", "page_html", "port", "projects", "publisher", "safety", "undo", "use_cases"])
+        self.assertEqual(sorted(call), ["change", "data_for", "err", "movement", "out", "page_html", "port", "profile", "projects", "publisher", "safety", "undo", "use_cases"])
         self.assertTrue(callable(call["change"]) and callable(call["undo"]))
         self.assertTrue(callable(call["safety"].listing) and callable(call["safety"].preview) and callable(call["safety"].restore))
         self.assertTrue(callable(call["projects"]))

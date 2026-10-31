@@ -16,7 +16,7 @@ from unittest import mock
 
 import _publish_fixture as fx
 from _paths import SRC  # noqa: F401  (puts src/ on the path)
-from clark import changes, page, platform, publish, publish_flow, server as sv, to_client
+from clark import changes, page, platform, profile_settings, publish, publish_flow, server as sv, to_client
 from clark.store import Invalid, Store, open_store
 
 EMPTY_BRANDING = tempfile.mkdtemp(prefix="clark-no-brand-")          # so a brand on this laptop never changes a test
@@ -53,7 +53,8 @@ class Rig:
                                                 data_dir=self.data_dir, branding=branding)
         self.httpd = sv.LocalServer((sv.HOST, 0), data_for=self.store.data_for, page_html=lambda: page.page_html(branding),
                                     projects=lambda: [{"code": "PUB", "name": "Harbour Bridge Programme"}], publisher=self.publisher,
-                                    change=changes.make_change(self.db, [], USER), undo=changes.make_undo(self.db, [], USER))
+                                    change=changes.make_change(self.db, [], USER), undo=changes.make_undo(self.db, [], USER),
+                                    profile=profile_settings.Profile(self.data_dir))
         self.httpd.handle_error = lambda *a: None
         threading.Thread(target=self.httpd.serve_forever, daemon=True).start()
         case.addCleanup(self.close)
@@ -856,9 +857,9 @@ class OnlyOneRouteWritesIntoTheClientFolder(Base):
 
     def test_every_route_is_listed_and_the_set_is_what_the_issue_expects(self):
         self.assertEqual(sorted(sv.POST_ROUTES), ["/api/backups/preview", "/api/backups/restore", "/api/change", "/api/client-folder",
-                                                  "/api/preview", "/api/publish", "/api/undo"])     # #111: the two backup routes; #147: preview
-        self.assertEqual(sorted(sv.GET_ROUTES), ["/api/backups", "/api/data", "/api/export", "/api/movement", "/api/projects",
-                                                 "/api/publication", "/api/use-cases"])     # #147: export; #136: movement
+                                                  "/api/preview", "/api/profile", "/api/publish", "/api/undo"])     # #111: the two backup routes; #147: preview; #180: profile
+        self.assertEqual(sorted(sv.GET_ROUTES), ["/api/backups", "/api/data", "/api/export", "/api/movement", "/api/profile",
+                                                 "/api/projects", "/api/publication", "/api/use-cases"])     # #147: export; #136: movement; #180: profile
 
     def test_no_route_takes_the_client_folder_from_the_request(self):
         status, got = self.rig.publish(to_client=True, client_folder=str(self.rig.root / "Elsewhere"))

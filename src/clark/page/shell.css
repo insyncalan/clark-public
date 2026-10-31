@@ -262,6 +262,10 @@ table.items tr.done .t { color: var(--text-muted); }
 .ddmenu:focus { outline: none; }
 .ddmenu [role="menuitem"] { all: unset; display: block; box-sizing: border-box; width: 100%; padding: 8px 14px; cursor: pointer; font-size: 14px; color: var(--text); }
 .ddmenu .sep { height: 1px; margin: 6px 0; background: var(--border); }
+.ddmenu .who { padding: 8px 14px 6px; max-width: 280px; }
+.ddmenu .who b { display: block; font-size: 14px; font-weight: var(--weight-medium); color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ddmenu .who small { display: block; font-size: 13px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ddmenu .who-link { text-decoration: underline; color: var(--link) !important; max-width: 280px; }
 .ddmenu .lab { padding: 6px 14px; font-size: 13px; color: var(--text-muted, var(--text)); }
 .ddmenu [role="menuitem"]:hover, .ddmenu [role="menuitem"]:focus-visible { background: var(--brand-blue-tint); color: var(--status-blue-text); }
 @media (prefers-reduced-motion: reduce) { .newb, .newb .w { transition: none; } }
@@ -813,6 +817,14 @@ a.pk-btn { display: inline-flex; align-items: center; text-decoration: none; }
 .styles legend { padding: 0; margin-bottom: 6px; font-size: var(--size-small); color: var(--text-muted); }
 .stylepick { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; }
 .stylepick input { accent-color: var(--brand-blue); width: 16px; height: 16px; margin-top: 3px; }
+.fld { display: grid; gap: 4px; margin: 0 0 12px; max-width: 420px; }
+.fld label { font-size: var(--size-body); font-weight: var(--weight-medium); color: var(--text); }
+.fld input { min-height: 36px; padding: 4px 10px; border: 1px solid var(--grey-300); border-radius: var(--radius); background: var(--surface); color: var(--text); font: inherit; }
+.fld input:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 1px; }
+.fld input[aria-invalid="true"] { border-color: var(--status-red-text); }
+.fld small { color: var(--text-muted); font-size: var(--size-small); }
+.fld-bad { margin: 0; min-height: 0; color: var(--status-red-text); font-size: var(--size-small); }
+.fld-bad:empty { display: none; }
 .stylepick small { display: block; color: var(--text-muted); font-size: var(--size-small); }
 html[data-secstyle="roomy"] .secs { gap: 36px 32px; margin-top: 28px; }
 html[data-secstyle="roomy"] .sec { padding: 20px 0 8px; }
@@ -878,3 +890,4 @@ h1, h2, h3, .fig .v, .tile .n { font-family: var(--font-head); font-weight: 800;
 
 /* the home banner: a still picture a person's own look may set (--art-home, --art-home-height); empty and flat by default */
 .frame.empty::before { content: ""; display: block; height: var(--art-home-height); background: var(--art-home) center / contain no-repeat; }
+.ddmenu .ck { display: inline-block; width: 1.2em; margin-right: 4px; color: var(--status-blue-text); }   /* the tick of the choice in use, with room before the word */

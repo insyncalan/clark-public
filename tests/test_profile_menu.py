@@ -3,7 +3,7 @@ menu's (arrows, Home, End, Esc back to the circle); the tooltip is the spec's wo
 
 Run: python3 dev/run_tests.py test_profile_menu
 Preview and Export (#147) ask the server's routes (tests/test_preview_export_route.py); here they are tested as the page uses them.
-Dark mode and the name-and-email line are not in the menu: the page has no dark-mode setting and holds no profile. Chrome is required.
+Appearance (System, Light, Dark) is in the menu (#179); the name-and-email line is not: the page holds no profile yet. Chrome is required.
 """
 import json
 import re
@@ -17,7 +17,10 @@ from clark import excel, server as sv
 # The tooltip is built from the entries that carry a short word, so it follows them; the test below pins the two together.
 TIP = "Your menu: Publish, Preview, Export, Settings"
 NAME = "Your menu"
-ITEMS = ["Publish…", "Preview the page in a new tab", "Export to Excel", "Settings", "Help"]
+ITEMS = ["Publish…", "Preview the page in a new tab", "Export to Excel", "Settings", "Help"]       # the commands
+LOOK = ["System", "Light", "Dark"]                                                                            # the Appearance group (#179), radio items between Export and Settings
+WHO = "Add your name in Settings"                                                                          # the top line while no name is typed (#180): a link
+ORDER = [WHO] + ITEMS[:3] + LOOK + ITEMS[3:]
 
 
 class ProfileMenu(Base):
@@ -29,7 +32,7 @@ class ProfileMenu(Base):
         return p.js("[].map.call(document.querySelectorAll('#profile-menu [role=menuitem]'), function(e){return e.textContent})")
 
     def active(self, p):
-        return p.js("document.activeElement.textContent")
+        return p.js("document.activeElement.textContent.replace('✓', '')")
 
     def test_C_the_tooltip_lists_the_items_and_the_name_is_short(self):
         with chrome() as cdp:
@@ -45,14 +48,14 @@ class ProfileMenu(Base):
             self.assertFalse(p.js("!!document.querySelector('[data-publish],[data-preview],[data-export]')"))
             self.assertEqual(p.js("document.querySelectorAll('header.top [data-kind]').length"), 0, "no entry is in the bar")
             self.open_menu(p)
-            self.assertEqual(self.labels(p), ITEMS, "the items and their order")
+            self.assertEqual(self.labels(p), [WHO] + ITEMS, "the items and their order")
 
-    def test_C_the_menu_has_a_separator_before_settings(self):
+    def test_C_the_menu_has_a_separator_before_settings_and_the_appearance_group_below_it(self):
         with chrome() as cdp:
             p = self.page(cdp)
             self.open_menu(p)
             self.assertEqual(p.js("[].map.call(document.querySelector('#profile-menu').children, function(e){return e.getAttribute('role')}).join()"),
-                             "menuitem,menuitem,menuitem,separator,menuitem,menuitem")
+                             "menuitem,menuitem,menuitem,menuitem,separator,presentation,menuitemradio,menuitemradio,menuitemradio,separator,menuitem,menuitem")
 
     def test_C_the_last_published_note_is_reachable_when_narrow(self):
         for w in (390, 900):
@@ -92,7 +95,7 @@ class ProfileMenu(Base):
             shown = self.labels(p)
             for word in tip[len(NAME) + 2:].split(", "):
                 self.assertTrue(any(l.startswith(word) for l in shown), word + " is an entry")
-            self.assertEqual([l for l in shown if not any(l.startswith(w) for w in words)], ["Help"], "only Help has no word in the tip")
+            self.assertEqual([l for l in shown if not any(l.startswith(w) for w in words)], [WHO, "Help"], "only the who line and Help have no word in the tip")
 
     def toast(self, p):
         p.until("!!document.querySelector('.toast .toast-text')", "a message appeared")
@@ -166,16 +169,16 @@ class ProfileMenu(Base):
         with chrome() as cdp:
             p = self.page(cdp)
             self.open_menu(p)
-            self.assertEqual(self.active(p), "Publish…", "focus is on the first item")
-            for want in ITEMS[1:]:
+            self.assertEqual(self.active(p), WHO, "focus is on the first item")
+            for want in ORDER[1:]:
                 p.key("ArrowDown", vk=40)
                 self.assertEqual(self.active(p), want)
             p.key("ArrowDown", vk=40)
-            self.assertEqual(self.active(p), "Publish…", "it wraps")
+            self.assertEqual(self.active(p), WHO, "it wraps")
             p.key("End", vk=35)
             self.assertEqual(self.active(p), "Help")
             p.key("Home", vk=36)
-            self.assertEqual(self.active(p), "Publish…")
+            self.assertEqual(self.active(p), WHO)
             p.key("ArrowUp", vk=38)
             self.assertEqual(self.active(p), "Help")
             p.key("Escape", code="Escape", vk=27)

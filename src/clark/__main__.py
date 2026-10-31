@@ -25,7 +25,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-from clark import appfiles, backup, changes, idle, movement_read, page, platform, publish, publish_flow, safety, server, store as clark_store, use_cases_read
+from clark import appfiles, backup, changes, idle, movement_read, page, platform, profile_settings, publish, publish_flow, safety, server, store as clark_store, use_cases_read
 
 DB_NAME = "clark.db"
 HERE = Path(__file__).resolve().parent
@@ -336,8 +336,9 @@ def main(argv=None, out=None, err=None, serve=server.serve, open_url=platform.op
             return 1
         roots = [] if args.demo else onedrive_roots
         store.close()           # #111: nothing keeps the database open while clark runs (each request opens its own), so Restore can swap the file
-        handlers = {"change": change or changes.make_change(store.path, roots),
-                    "undo": undo or changes.make_undo(store.path, roots)}
+        who = profile_settings.Profile(store.path.parent)          # #180: the name typed in Settings, else the login name, is the name on each change
+        handlers = {"change": change or changes.make_change(store.path, roots, who.who),
+                    "undo": undo or changes.make_undo(store.path, roots, who.who)}
         server.set_open_files(appfiles.open_files())
         server.set_idle(idle.Idle.from_environ(environ) if idle.launched(environ) else None)
         server.set_data_mark(appfiles.data_mark(store.path.parent))
@@ -345,7 +346,8 @@ def main(argv=None, out=None, err=None, serve=server.serve, open_url=platform.op
         done = serve(port=port, data_for=store.data_for, page_html=page.page_html,
                      projects=projects_of(store.path, roots), out=shown,
                      err=err,
-                     publisher=publish_flow.Publisher(store.path, roots, data_dir=store.path.parent),
+                     publisher=publish_flow.Publisher(store.path, roots, by_user=who.who, data_dir=store.path.parent),
+                     profile=who,
                      movement=movement_read.make_read(store.milestone_moves, store.data_for),
                      use_cases=use_cases_read.make_read(store.data_for, use_case_ids_on_file(store)),
                      safety=safety.Safety(store.path, roots),

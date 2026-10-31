@@ -57,7 +57,7 @@ export function useMenuState() {
   return [open, setOpen];
 }
 
-// items: [{id, name, line?}], or {id, sep: true} for a separator, or {id, lab} for a line of words that is not a command. `onPick(id)` runs after the menu has closed. With no items the button is a plain button and a click
+// items: [{id, name, line?, checked?}] (`checked` true or false makes it a radio item, marked when it is the one in use), or {id, sep: true} for a separator, or {id, lab} for a line of words that is not a command, or {id, head: {name, line, title}} for the top line (a name and, under it, a quiet line), or a command with `link` true, drawn as a link. `onPick(id)` runs after the menu has closed. With no items the button is a plain button and a click
 // is `onClick()` (so a button that sometimes has a menu keeps the same element when it has none).
 export function Menu({ label, items, onPick, onClick, icon, tip, ariaLabel, id, btnCls, labelCls, menuId, menuLabel, left, chevron = true }) {
   const [open, setOpen] = useMenuState();
@@ -76,8 +76,10 @@ export function Menu({ label, items, onPick, onClick, icon, tip, ariaLabel, id, 
       </button>
       {open && menu ? (
         <MenuPanel label={menuLabel || ariaLabel || label} id={menuId} cls={left ? "left" : ""} anchor={btn.current} onClose={close}>
-          {items.map((it) => it.sep ? <div key={it.id} class="sep" role="separator"></div> : it.lab ? <div key={it.id} class="lab" role="presentation">{it.lab}</div> : (
-            <button key={it.id} type="button" role="menuitem" tabIndex={-1} data-kind={it.id} onClick={() => { close("pick"); onPick(it.id); }}>
+          {items.map((it) => it.sep ? <div key={it.id} class="sep" role="separator"></div> : it.head ? <div key={it.id} class="who" role="presentation" title={it.head.title}><b>{it.head.name}</b>{it.head.line ? <small>{it.head.line}</small> : null}</div> : it.lab ? <div key={it.id} class="lab" role="presentation">{it.lab}</div> : (
+            <button key={it.id} type="button" class={it.link ? "who-link" : undefined} role={it.checked === undefined ? "menuitem" : "menuitemradio"} aria-checked={it.checked === undefined ? undefined : it.checked ? "true" : "false"}
+              tabIndex={-1} data-kind={it.id} onClick={() => { close("pick"); onPick(it.id); }}>
+              {it.checked === undefined ? null : <span class="ck" aria-hidden="true">{it.checked ? "✓" : ""}</span>}
               {it.line ? <span><b>{it.name}</b><small>{it.line}</small></span> : it.name}
             </button>
           ))}
