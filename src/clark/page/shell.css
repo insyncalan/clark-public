@@ -361,6 +361,22 @@ input.sec-title { width: 100%; }
 table.items tbody tr { cursor: pointer; }
 table.items tbody tr:hover { background: var(--grey-50); }
 table.items tbody tr:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: -2px; }
+/* Selecting several: not by colour alone. A picked row or card has a tick before its title and a border; the tint is extra. */
+table.items tbody tr.picked { background: color-mix(in srgb, var(--brand-blue-tint) 60%, var(--surface)); box-shadow: inset 4px 0 0 var(--brand-blue), inset 0 0 0 1px var(--brand-blue); }
+table.items tbody tr.picked:hover { background: var(--brand-blue-tint); }
+table.items tbody tr.picked:focus-visible { outline-offset: -3px; }
+.tick { display: inline-grid; place-items: center; width: 16px; height: 16px; margin-right: 6px; vertical-align: -2px; border-radius: 50%; background: var(--brand-blue); color: var(--surface); }
+.tick .i { width: 11px; height: 11px; stroke-width: 3; }
+.gtick-hit { display: inline-grid; place-items: center; width: 24px; height: 24px; margin-right: 4px; vertical-align: middle; flex: none; cursor: pointer; }   /* the box is 16 px; the label around it is the 24 px target */
+.gtick { width: 16px; height: 16px; margin: 0; accent-color: var(--brand-blue); cursor: pointer; }
+.gtick:disabled { cursor: not-allowed; opacity: .45; }
+.gtick:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 2px; }
+.selbar { display: flex; align-items: center; gap: 12px; margin: 10px 0 2px; padding: 6px 6px 6px 14px; border: 1px solid var(--brand-blue); border-radius: var(--radius); background: color-mix(in srgb, var(--brand-blue-tint) 60%, var(--surface)); font-size: 14px; }
+.selbar .sb-n { font-weight: var(--weight-medium); color: var(--heading); }
+.selbar .sb-x { margin-left: auto; width: 30px; height: 30px; }
+.selbar .sb-x[data-tip]:hover::after, .selbar .sb-x[data-tip]:focus-visible::after { right: 0; }
+.sel-note { margin: 4px 0 0; font-size: var(--size-small); }
+@media (prefers-reduced-motion: no-preference) { table.items tbody tr { transition: background-color var(--dur-instant) var(--ease-out); } }
 .cpop { position: fixed; z-index: 35; min-width: 180px; max-width: min(320px, calc(100vw - 16px)); padding: 4px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow); color: var(--text); font-size: var(--size-body); cursor: default; }
 .cpop.cmenu { display: block; }
 .cpop.cmenu > div { display: flex; flex-direction: column; }
@@ -453,6 +469,13 @@ table.items.grouped tr.grp th { padding: 10px 4px 6px; border-top: 1px solid var
 .bcard { position: relative; background: var(--surface); border: 1px solid var(--grey-200); border-radius: var(--radius); box-shadow: var(--shadow); padding: 10px 12px; }
 .board[data-editing="1"] .bcard { cursor: grab; user-select: none; -webkit-user-select: none; }
 .bcard.sel { border-color: var(--brand-blue); }
+.bcard.picked { border-color: var(--brand-blue); box-shadow: 0 0 0 2px var(--brand-blue), var(--shadow); background: color-mix(in srgb, var(--brand-blue-tint) 60%, var(--surface)); }
+.col-h { display: flex; align-items: center; }
+.col-h .gtick-hit { margin: 0 0 0 8px; }
+.col-h .col-b { flex: 1; min-width: 0; padding-left: 8px; }
+.col.shut .col-h { flex-direction: column; height: auto; }
+.col.shut .col-h .gtick-hit { margin: 8px 0 0; }
+.col.shut .col-h .col-b { padding-left: 0; }
 .bcard.drag { opacity: .5; }
 .bcard.done .bc-title { color: var(--text-muted); }
 .bc-main { cursor: pointer; border-radius: var(--radius-sm); }

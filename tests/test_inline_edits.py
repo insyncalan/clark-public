@@ -202,6 +202,15 @@ def click(cdp, sid, selector):
     cdp.call("Input.dispatchMouseEvent", {"type": "mouseReleased", "x": x, "y": y, "button": "left", "buttons": 0, "clickCount": 1}, sid)
 
 
+def dblclick(cdp, sid, selector):
+    """Two presses on the same place, the second a double click (#195: one click on a row selects it, two open its peek)."""
+    click(cdp, sid, selector)
+    box = cdp.js(f"(() => {{ const b = document.querySelector({json.dumps(selector)}).getBoundingClientRect(); return [b.x + Math.min(b.width / 2, 20), b.y + b.height / 2]; }})()", sid)
+    x, y = box
+    cdp.call("Input.dispatchMouseEvent", {"type": "mousePressed", "x": x, "y": y, "button": "left", "buttons": 1, "clickCount": 2}, sid)
+    cdp.call("Input.dispatchMouseEvent", {"type": "mouseReleased", "x": x, "y": y, "button": "left", "buttons": 0, "clickCount": 2}, sid)
+
+
 class Live(unittest.TestCase):
     def setUp(self):
         need_chrome()
@@ -294,13 +303,13 @@ class Live(unittest.TestCase):
         self.assertFalse(text.lower().startswith("clark"), text)
         self.assertNotIn("Ask clark", text)
 
-    def test_view_has_no_pickers_and_the_row_click_opens_the_peek(self):
+    def test_view_has_no_pickers_and_a_row_double_click_opens_the_peek(self):
         for width in (1400, 900):
             with self.subTest(width=width), chrome() as cdp:
                 sid = self.open_page(cdp, width, edit=False)
                 self.assertEqual(cdp.js("document.querySelectorAll('[data-cell], [data-pop], .cell-pick').length", sid), 0, "View changes nothing")
-                click(cdp, sid, "tr[data-id='TUL-A-001'] .t")
-                self.until(cdp, sid, "location.hash.includes('item=TUL-A-001')", "a row click opens the item's peek (its address)")
+                dblclick(cdp, sid, "tr[data-id='TUL-A-001'] .t")
+                self.until(cdp, sid, "location.hash.includes('item=TUL-A-001')", "a double click on a row opens the item's peek (its address)")
                 self.assertEqual(cdp.js("clarkPage.peek()", sid), {"kind": "item", "id": "TUL-A-001"})
                 cdp.js("clarkPage.closePeek()", sid)
                 self.until(cdp, sid, "!location.hash.includes('item=')", "the peek closed")

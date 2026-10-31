@@ -180,8 +180,8 @@ class RealBrowser(unittest.TestCase):
                                          "nothing inside the list scrolls sideways")
                         text = cdp.js("document.querySelector('#work').innerText", sid)
                         self.assertNotRegex(text, r"\d{4}-\d{2}-\d{2}", "dates read DD-MM-YYYY")
-                        self.assertEqual(cdp.js("document.querySelectorAll('#work table input, #work table button:not(.grp-b), #work table select,"
-                                                " #work table textarea, #work table [contenteditable]').length", sid), 0, "nothing in the list edits data (a group heading only opens and shuts its rows)")
+                        self.assertEqual(cdp.js("document.querySelectorAll('#work table input:not(.gtick), #work table button:not(.grp-b), #work table select,"
+                                                " #work table textarea, #work table [contenteditable]').length", sid), 0, "nothing in the list edits data (a group heading only opens and shuts its rows; its tick box only selects them)")
                         self.assertIn(f"{len(ids)} items", text)
             self.assertEqual(blocked, [], f"the policy blocked nothing: {blocked}")
 

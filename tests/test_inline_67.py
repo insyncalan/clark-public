@@ -217,11 +217,15 @@ class RowClick(Base):
     def peek(self, p):
         return p.js("(window.clarkPage.peek() || {}).id || ''")
 
-    def test_a_click_on_a_row_opens_its_peek_and_a_click_in_a_field_or_button_does_not(self):
+    def test_a_double_click_on_a_row_opens_its_peek_and_one_in_a_field_or_button_does_not(self):
+        # #195: a single click selects the row; a double click opens the peek
+        dbl = "(function(el){el.dispatchEvent(new MouseEvent('click',{bubbles:true,detail:1})); el.dispatchEvent(new MouseEvent('dblclick',{bubbles:true,detail:2}));})"
         with chrome() as cdp:
             for w in SIZES:
                 p = self.work(cdp, w)
                 p.js(f"document.querySelector('tr[data-id=\"{self.a}\"] .c-owner').click()")
+                self.assertEqual(self.peek(p), "", "a single click selects, it does not open")
+                p.js(f"{dbl}(document.querySelector('tr[data-id=\"{self.a}\"] .c-owner'))")
                 p.until(f"window.clarkPage.peek() && window.clarkPage.peek().id === '{self.a}'", f"the row's peek opened at {w}")
                 p.js("window.clarkPage.closePeek()")
                 p.until("!window.clarkPage.peek()", "closed")
@@ -230,8 +234,8 @@ class RowClick(Base):
                      "var b=document.createElement('button'); b.id='probe-btn'; td.appendChild(b);"
                      "var c=document.createElement('span'); c.id='probe-ce'; c.setAttribute('contenteditable','true'); td.appendChild(c);})()")
                 for probe in ("probe-in", "probe-btn", "probe-ce"):
-                    p.js(f"document.getElementById('{probe}').click()")
-                self.assertEqual(self.peek(p), "", "a click inside a field or on a button opens nothing")
+                    p.js(f"{dbl}(document.getElementById('{probe}'))")
+                self.assertEqual(self.peek(p), "", "a double click inside a field or on a button opens nothing")
 
     def test_enter_on_a_focused_row_opens_it_and_a_selection_does_not(self):
         with chrome() as cdp:

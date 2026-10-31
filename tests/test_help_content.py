@@ -67,7 +67,7 @@ class Shape(unittest.TestCase):
         self.assertEqual((len(START["loop"]), len(START["first"]), len(START["jobs"]), len(START["where"]), len(START["rules"])),
                          (5, 5, 12, 6, 4))
         self.assertEqual((len(STEPS), len(SECTIONS)), (26, 30))
-        self.assertEqual((len(SRC["reference"]["keys"]), len(SRC["reference"]["icons"])), (21, 31))
+        self.assertEqual((len(SRC["reference"]["keys"]), len(SRC["reference"]["icons"])), (32, 31))
 
     def test_ids_are_unique_plain_and_listed_in_a_group(self):
         for kind, rows, groups in (("task", STEPS, SRC["howto"]["groups"]), ("section", SECTIONS, SRC["reference"]["groups"])):

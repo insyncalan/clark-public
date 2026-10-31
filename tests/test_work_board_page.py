@@ -18,7 +18,7 @@ from _paths import ROOT, SRC
 from clark import changes, page, server as sv  # noqa: E402
 from test_board import make_data  # noqa: E402
 from test_server import Running, chrome, wait  # noqa: E402
-from test_work_filters import click, hover, key, need_chrome, where  # noqa: E402
+from test_work_filters import click, dblclick, hover, key, need_chrome, where  # noqa: E402
 from test_work_items import page_target  # noqa: E402
 
 PAGE_SRC = SRC / "clark" / "page" / "src"
@@ -632,14 +632,14 @@ class Collapse(Base):
 
 
 class Peek(Base):
-    def test_a_click_opens_the_peek_hook_and_another_card_moves_it_without_a_new_entry(self):
+    def test_a_double_click_opens_the_peek_hook_and_a_click_on_another_card_moves_it_without_a_new_entry(self):
         with chrome() as cdp:
             sid = self.visit(cdp)
             self.board(cdp, sid, "status")
             cdp.js("window.__peeks = []; window.addEventListener('clark:open-peek', (e) => window.__peeks.push(e.detail.id))", sid)
             a, b = self.id_of("Order the laptops"), self.id_of("Send the invitations")
             n = cdp.js("history.length", sid)
-            click(cdp, sid, f"article[data-id='{a}'] .bc-main")
+            dblclick(cdp, sid, f"article[data-id='{a}'] .bc-main")      # #195: one click selects the card, a double click opens it
             self.until(cdp, sid, f"location.hash.includes('item={a}')", "the address")
             self.assertEqual(cdp.js("window.__peeks", sid), [a])
             self.until(cdp, sid, f"document.querySelector(\"article[data-id='{a}']\").classList.contains('sel')", "the selected look")
@@ -694,7 +694,7 @@ class FullScreen(Base):
             click(cdp, sid, "#board-full")
             self.until(cdp, sid, "!document.body.classList.contains('board-full')", "the icon leaves too")
 
-    def test_a_card_click_in_full_screen_opens_the_peek_and_a_move_keeps_full_screen(self):
+    def test_a_card_double_click_in_full_screen_opens_the_peek_and_a_move_keeps_full_screen(self):
         with chrome() as cdp:
             sid = self.visit(cdp)
             self.board(cdp, sid, "status")
@@ -704,7 +704,7 @@ class FullScreen(Base):
             self.drag(cdp, sid, a, self.cell("Delayed"))
             self.wait_toast(cdp, sid, "done")
             self.assertTrue(cdp.js("document.body.classList.contains('board-full')", sid), "a move redraws the board but keeps full screen")
-            click(cdp, sid, f"article[data-id='{a}'] .bc-main")
+            dblclick(cdp, sid, f"article[data-id='{a}'] .bc-main")
             self.until(cdp, sid, f"location.hash.includes('item={a}')")
 
     def test_full_screen_ends_when_the_table_comes_back(self):
