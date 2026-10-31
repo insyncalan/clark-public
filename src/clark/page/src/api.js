@@ -53,6 +53,54 @@ async function postItem(path, body) {
 // unless the request says otherwise (#45: glance_tiles and projects reply with tiles or the project, not the sections).
 export const sendChange = (project, req) => post("/api/change", { project, kind: KIND, ...req }, !req.kind || req.kind === KIND ? hasSections : () => true);
 export const sendUndo = (project, applyId) => post("/api/undo", { project, apply_id: applyId });
+
+// Sneak peek's reading (#42): typed words about one item as from → to changes. Read only; the server writes nothing for it.
+// {ok: true, reading} or {ok: false, message}. A refusal of the words (a date that isn't a day) comes back with its own message.
+export async function sneakRead(project, id, words) {
+  try {
+    const r = await fetch("/api/sneak/read", {
+      method: "POST", headers: { "X-Clark-Token": token(), "Content-Type": "application/json" },
+      body: JSON.stringify({ project, id, text: words }), cache: "no-store",
+    });
+    const reply = await r.json().catch(() => null);
+    if (r.ok && reply && reply.ok === true && Array.isArray(reply.changes)) return { ok: true, reading: reply };
+    if (r.ok && reply && reply.ok === false && typeof reply.message === "string") return { ok: false, message: reply.message };
+    return { ok: false, message: plainChange(r.ok ? 500 : r.status, reply) };
+  } catch (e) {
+    return { ok: false, message: plainChange(0) };
+  }
+}
+
+// Change fields of one work item (#68, through /api/change, place "peek"): {ok: true, reply} or {ok: false, message}. The reply has
+// no sections. A refusal of the change (400, 409) comes back in the route's own plain, fixed words (no field name, no value); any
+// other failure is said by plainChange.
+export async function sendPeekChange(project, kind, id, changes) {
+  try {
+    const r = await fetch("/api/change", {
+      method: "POST", headers: { "X-Clark-Token": token(), "Content-Type": "application/json" },
+      body: JSON.stringify({ project, kind, op: "update", id, changes, place: "peek" }), cache: "no-store",
+    });
+    const reply = await r.json().catch(() => null);
+    if (r.ok && reply && reply.ok === true) return { ok: true, reply };
+    const said = reply && typeof reply.message === "string" && reply.message.length <= 240 ? reply.message : "";
+    if ((r.status === 400 || r.status === 409) && said) return { ok: false, message: said };
+    return { ok: false, message: plainChange(r.ok ? 500 : r.status, reply) };
+  } catch (e) {
+    return { ok: false, message: plainChange(0) };
+  }
+}
+
+// The project's data again, read quietly (the page stays as it is while it loads): what the peek and the list show is what clark has.
+export async function readData(project) {
+  try {
+    const r = await fetch(`/api/data?project=${encodeURIComponent(project)}`, { headers: { "X-Clark-Token": token() }, cache: "no-store" });
+    const body = await r.json().catch(() => null);
+    return r.ok && body && body.ok && body.data ? body.data : null;
+  } catch (e) {
+    return null;
+  }
+}
+
 // #80: change fields of one work item from its cell (`table` actions, raid or decisions; `changes` only the fields
 // clark/changes.py takes for it). A refusal is said in the page's own words (plainChange), never the server's.
 export const sendCellChange = (project, table, id, changes, place) =>

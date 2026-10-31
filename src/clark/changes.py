@@ -104,7 +104,7 @@ OP_KEYS = {NEW: ("values", "after"), UPDATE: ("id", "changes"), MOVE: ("id", "be
            ARCHIVE: ("id",), RESTORE: ("id",), PICK: ("ids",)}
 MAX_PICK = 100                            # the picker adds at most this many rows in one step
 MAX_FLAGS = 4                             # a move may set the `beside` of at most this many sections (the moved one, its old partner, its new one, the one before)
-PLACES = tuple(p for p in ("menu", "cell", "report", "board") if p in clark_store.PLACES)   # where the change was made (the step's place); "board" counts once the store knows it
+PLACES = tuple(p for p in ("menu", "cell", "report", "board", "peek") if p in clark_store.PLACES)   # where the change was made (the step's place); "board" counts once the store knows it; "peek" is Sneak peek (#42)
 MOVEMENT_PLACE = "movement"               # #136: a Movement change is written as place "dashboard" with the src_ref "Movement" (no schema change)
 MADE_OP = clark_store.OP_MADE            # the log's word for a row a step made: the store's own constant
 VIA = "dashboard"                         # the route of every step made here; an undo is never undone from here

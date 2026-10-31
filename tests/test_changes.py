@@ -1161,6 +1161,13 @@ class Items(Api):
         self.assertEqual((status, body.get("message")), (200, None), body)
         self.assertEqual(self.s.con.execute("SELECT place FROM item_events WHERE apply_id = ?", (body["apply_id"],)).fetchone()[0], "board")
 
+    def test_the_peek_is_a_place_and_a_made_up_one_still_is_not(self):
+        self.assertIn("peek", changes.PLACES)
+        status, body = self.change({**self.item("actions", self.a, status="Closed"), "place": "peek"})
+        self.assertEqual((status, body.get("message")), (200, None), body)
+        self.assertEqual(self.s.con.execute("SELECT place FROM item_events WHERE apply_id = ?", (body["apply_id"],)).fetchone()[0], "peek")
+        self.no({**self.item("actions", self.a, status="Open"), "place": "peeks"}, changes.BAD_PLACE)
+
     def test_board_is_not_taken_while_the_store_does_not_know_it(self):
         if "board" in store_module.PLACES:
             self.skipTest("the store knows 'board' now")

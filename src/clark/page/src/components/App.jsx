@@ -3,6 +3,7 @@ import { view, status } from "../stores/report.js";
 import { TopBar } from "./TopBar.jsx";
 import { Milestones, Settings, Gate } from "./Views.jsx";
 import { Dashboard } from "./Dashboard.jsx";
+import { Peek } from "./Peek.jsx";
 import { WorkItems } from "./WorkItems.jsx";
 
 const PAGES = { dashboard: Dashboard, work: WorkItems, milestones: Milestones, settings: Settings };
@@ -16,6 +17,7 @@ export function App({ tools }) {
     <>
       <TopBar tools={tools} />
       <main id="main">{Layer ? <Layer>{body}</Layer> : body}</main>
+      {status.value === "ready" ? <Peek tools={tools} /> : null}
       {Toast ? <Toast /> : null}
     </>
   );

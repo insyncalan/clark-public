@@ -345,7 +345,7 @@
      "A warning shows when an action is overdue or due on a weekend, with one-click fixes such as **Move to Friday**.",
      "**Latest update**: click to write it. **Draft** writes one from the item’s own facts.",
      "**Details** holds the description, type, workstream, milestone, use case and client wording. It stays open or closed as you last left it.",
-     "At the foot, **All**, **Activity**, **Updates** and **Source** show the item’s history and where it came from.",
+     "In Edit, the **Activity** tab under the title shows the item’s history: who changed what, how and when, newest first. **Details** goes back to the fields.",
      "With the peek open, click another item anywhere on the page and the peek moves to it. A click elsewhere, or [[Esc]], closes it. The up and down arrows at the top step through the list."
     ],
     "n": "Drag the peek’s left edge to make it wider (a double-click puts it back), or press the corners icon to take it across the whole screen. Your width is kept."
@@ -353,11 +353,11 @@
    {
     "id": "change-an-item-in-words",
     "g": "Work items",
-    "t": "Change an item in words (Sneak peek)",
+    "t": "Change an item with words (Sneak peek)",
     "w": "An open peek › the sparkle, or [[/]] [[/]]",
     "go": "work",
     "s": [
-     "With an item or milestone open in the peek, press [[/]] twice quickly (when you aren’t typing in a box), press the sparkle at the top, or press “Change this item in words” at the foot.",
+     "With an item or milestone open in the peek, press [[/]] twice quickly (when you aren’t typing in a box), or press the sparkle at the top, “Change an item with words”.",
      "Type the change, for example “move to Friday, owner Jo, high priority”.",
      "The words clark read are marked above the box, and a card shows each field before and after.",
      "Press [[Enter]] (or [[Shift+Enter]]), or **Make the change**, to save it. **Not now** or [[Esc]] closes it. The fields that changed flash for a moment, and the message has **Undo**.",
@@ -589,7 +589,7 @@
     "s": [
      "Every change shows a message at the foot of the page with **Undo**, for about six seconds.",
      "A step of several changes undoes as one: an import, **Add from your project record**, an archive with everything in it, a board move across a lane and a column.",
-     "The peek’s **All**, **Activity**, **Updates** and **Source** show each change: who, what it was, what it became, and when. A milestone’s moves are also in **Movement › What changed**.",
+     "In Edit, the peek’s **Activity** tab shows each change to the item: who made it, how, what it was, what it became, and when. A milestone’s moves are also in **Movement › What changed**.",
      "In an editor, the undo button or [[Mod+Z]] steps back through your typing. [[Esc]] cancels the whole edit."
     ]
    },
@@ -1092,8 +1092,7 @@
        "**The title**, then **Status**, **Priority**, **Owner** and **Due**, each with its icon in colour: the state’s colour, the priority’s, and the date’s (red when late, amber when due within a week).",
        "**Latest update**, with **Draft**; then when it was last updated.",
        "**Details**: Description, Type, Workstream, Milestone, Use case and Client wording.",
-       "**History**: All, Activity, Updates and Source.",
-       "**The foot**: “Change this item in words”, and “Each change saves on its own, with Undo”."
+       "**Activity** (in Edit): each change to the item, newest first: who, how and when."
       ]
      ],
      [
@@ -1741,7 +1740,7 @@
    [
     "sparkle",
     "Sneak peek, Draft",
-    "Change an item in words; draft the latest update",
+    "Change an item with words; draft the latest update",
     "The peek"
    ],
    [

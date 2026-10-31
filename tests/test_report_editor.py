@@ -19,6 +19,7 @@ from unittest import mock
 from _demo import USER, DemoStore
 from _editor_checks import edit_elements
 from _paths import SRC, TOOLS
+import _testpage as testpage
 
 sys.path.insert(0, str(TOOLS))
 import build_page  # noqa: E402
@@ -163,7 +164,7 @@ class Base(unittest.TestCase):
         self.real_undo = changes.make_undo(self.store.path, [], USER)
         self.sent = []                       # every request the page made that reached the seams: (which, request)
         self.failure = None                     # a function (req) -> (status, body) or an exception to raise
-        self.s = Running(data_for=self.store.data_for, page_html=lambda: page.page_html(EMPTY_BRANDING),
+        self.s = Running(data_for=self.store.data_for, page_html=lambda: testpage.html(),
                          change=self.seam(self.real_change, "change"), undo=self.seam(self.real_undo, "undo"))
         self.addCleanup(self.s.close)
         quiet = mock.patch.object(sv.LOG, "disabled", True)               # a fault on purpose is logged by the server
@@ -255,7 +256,7 @@ class Modes(Base):
             self.assertEqual(edit_elements(cdp, p.sid), [], "and gone again in View")
 
     def test_a_report_with_no_sections_shows_none_and_does_not_crash(self):
-        s = Running(data_for=DATA.get, page_html=lambda: page.page_html(EMPTY_BRANDING))
+        s = Running(data_for=DATA.get, page_html=lambda: testpage.html())
         self.addCleanup(s.close)
         with chrome() as cdp:
             p = Pg.at(self, cdp, s.port)

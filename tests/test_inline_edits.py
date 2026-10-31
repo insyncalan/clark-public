@@ -20,8 +20,9 @@ from unittest import mock
 
 from _demo import USER
 from _paths import SRC
+import _testpage as testpage
 
-from clark import changes, page, server as sv  # noqa: E402
+from clark import changes, server as sv  # noqa: E402
 from clark.store import open_store  # noqa: E402
 from test_server import CHROME, Running, chrome, wait  # noqa: E402
 from test_work_items import FIXED_DATE, TODAY, bundled, load_demo, page_target  # noqa: E402
@@ -219,7 +220,7 @@ class Live(unittest.TestCase):
                 return self.failure(req) if self.failure else real(req)
             return call
         self.s = Running(data_for=self.read, projects=lambda: [{"code": "TUL", "name": "Tulip"}],
-                         page_html=lambda: page.page_html(EMPTY_BRANDING), change=seam(real_change, "change"), undo=seam(real_undo, "undo"))
+                         page_html=lambda: testpage.html(), change=seam(real_change, "change"), undo=seam(real_undo, "undo"))
         self.addCleanup(self.s.close)
         quiet = mock.patch.object(sv.LOG, "disabled", True)
         quiet.start()

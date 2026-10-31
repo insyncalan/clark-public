@@ -3,7 +3,8 @@
 // the page is what clark saved. A failed change draws nothing and the toast says why, in plain words (api.js).
 import { signal } from "@preact/signals";
 import { data, project, reread } from "./report.js";
-import { sendChange, sendUndo, sendItemChange, sendCellChange, sendMilestoneChange } from "../api.js";
+import { sendChange, sendUndo, sendItemChange, sendCellChange, sendMilestoneChange, readData } from "../api.js";
+import { flashed } from "./wordsState.js";
 
 // null, or { id, kind: "done" | "note" | "problem", text, undo: the step's id or null, code: the project the step was made in }
 export const toast = signal(null);
@@ -52,7 +53,7 @@ async function readAgain(code, what) {
 }
 
 // Runs `task` after every earlier one has finished, whether it worked or not.
-function enqueue(task) {
+export function enqueue(task) {
   const run = tail.then(task);
   tail = run.catch(() => {});
   return run;
@@ -102,6 +103,7 @@ export function undo(applyId, code = project.value) {
     // Read again after every undo: an item's cell, or a section's body, comes back from the database. Not read again because the
     // person has opened another project meanwhile: nothing is wrong, so nothing is said about it.
     if (!(await readAgain(code, "The change was undone"))) return r.reply;
+    if (Array.isArray(r.reply.reversed)) flash(r.reply.reversed.map((e) => ({ ref: e.ref, field: e.field })));   // the peek (#42) flashes what went back
     const skipped = Array.isArray(r.reply.skipped) && r.reply.skipped.length > 0;
     say("done", skipped && typeof r.reply.words === "string" && r.reply.words ? r.reply.words : back || "Undone.", null, code);
     return r.reply;
@@ -127,6 +129,21 @@ export function changeCell(table, id, changes, done) {
     else if (done.always) say("done", done.text, null, code);                   // a decision that is made: it changed, and has no Undo
     return r.reply;
   });
+}
+
+// Reads the project's data again and puts it on the page (the work items and the peek read it). A failed read leaves the page as it is.
+export async function refresh() {
+  const d = await readData(project.value);
+  if (d) data.value = d;
+}
+
+// Marks fields as changed for a moment: [{ref, field}]. The peek flashes the rows that show them.
+export function flash(list) {
+  const mine = list.filter((e) => e && typeof e.ref === "string" && typeof e.field === "string");
+  if (!mine.length) return;
+  const token = {};
+  flashed.value = { token, list: mine };
+  setTimeout(() => { if (flashed.value && flashed.value.token === token) flashed.value = null; }, 1600);
 }
 
 // A change to one milestone from the Movement block (#136): one step, one Undo. Resolves to {ok: true, reply} or {ok: false, message};

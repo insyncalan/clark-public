@@ -41,3 +41,17 @@
 .mvm-confirm { margin: 12px 0 4px; }
 .mvm-problems p { margin: 4px 0; color: var(--status-red-text); }
 @media (max-width: 1100px) { .mvm-row { grid-template-columns: 1fr auto; } .mvm-track { grid-column: 1 / -1; } }
+/* The peek's Details and Activity tabs (#42): Edit only. */
+.pk-tabs { display: flex; gap: 4px; margin: 4px 0 8px; border-bottom: 1px solid var(--grey-200); }
+.pk-tab { min-height: 32px; padding: 4px 12px; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--text-muted); font: inherit; font-size: var(--size-small); cursor: pointer; }
+.pk-tab.on { color: var(--text); border-bottom-color: var(--brand-blue); font-weight: var(--weight-medium); }
+.pk-tab:focus-visible, .pk-activity:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.pa-list { list-style: none; margin: 0; padding: 0; }
+.pa-row { padding: 8px 0; border-top: 1px solid var(--grey-100); }
+.pa-meta { margin: 0; font-size: var(--size-small); color: var(--text-muted); }
+.pa-who { color: var(--text); font-weight: var(--weight-medium); }
+.pa-what { margin: 2px 0 0; color: var(--text); overflow-wrap: anywhere; }
+.pa-kind, .pa-f { color: var(--text-muted); }
+.pa-from, .pa-what del { color: var(--text-muted); text-decoration: line-through; }
+.pa-what ins { color: var(--status-green-text); text-decoration: underline; }
+.pa-none { padding: 12px 0; margin: 0; }

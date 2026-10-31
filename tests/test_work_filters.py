@@ -20,6 +20,7 @@ from pathlib import Path
 from unittest import mock
 
 from _paths import ROOT, SRC
+import _testpage as testpage
 
 import build_page  # noqa: E402  (dev/tools)
 import esbuild  # noqa: E402
@@ -504,7 +505,7 @@ class RealBrowser(unittest.TestCase):
 
     def serve(self):
         s = Running(data_for=lambda code: copy.deepcopy(self.data.get(code)), projects=lambda: self.projects,
-                    page_html=lambda: page.page_html(tempfile.mkdtemp()))
+                    page_html=lambda: testpage.html())
         self.addCleanup(s.close)
         return s
 
@@ -808,9 +809,9 @@ class RealBrowser(unittest.TestCase):
             self.assertEqual(cdp.js("clarkPage.peek().id", sid), item)
             self.assertEqual(self.pressed(cdp, sid, "[data-type=action]"), "true")
             self.assertEqual(self.pressed(cdp, sid, "[data-show=all]"), "true")
-            cdp.js("clarkPage.closePeek()", sid)                            # closing it steps Back to the entry before it (test_router pins this): its filters
+            cdp.js("clarkPage.closePeek()", sid)                            # a filter was changed while it was open, so closing rewrites the entry (#42): the filter stays
             self.assertTrue(wait(lambda: cdp.js("clarkPage.peek()", sid) is None))
-            self.assertTrue(wait(lambda: cdp.js("clarkPage.filters()", sid) == "mode:all"))
+            self.assertTrue(wait(lambda: cdp.js("clarkPage.filters()", sid) == "mode:all;type:action"))
 
     def test_too_many_filters_for_the_address_is_refused_with_a_plain_line_and_changes_nothing(self):
         s = self.serve()

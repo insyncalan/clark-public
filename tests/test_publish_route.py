@@ -856,9 +856,9 @@ class OnlyOneRouteWritesIntoTheClientFolder(Base):
 
     def test_every_route_is_listed_and_the_set_is_what_the_issue_expects(self):
         self.assertEqual(sorted(sv.POST_ROUTES), ["/api/backups/preview", "/api/backups/restore", "/api/change", "/api/client-folder",
-                                                  "/api/preview", "/api/publish", "/api/undo"])     # #111: the two backup routes; #147: preview
-        self.assertEqual(sorted(sv.GET_ROUTES), ["/api/backups", "/api/data", "/api/export", "/api/movement", "/api/projects",
-                                                 "/api/publication", "/api/use-cases"])     # #147: export; #136: movement
+                                                  "/api/preview", "/api/publish", "/api/sneak/read", "/api/undo"])     # #111: the two backup routes; #147: preview; #42: the sneak read
+        self.assertEqual(sorted(sv.GET_ROUTES), ["/api/activity", "/api/backups", "/api/data", "/api/export", "/api/movement", "/api/projects",
+                                                 "/api/publication", "/api/use-cases"])     # #147: export; #136: movement; #42: activity
 
     def test_no_route_takes_the_client_folder_from_the_request(self):
         status, got = self.rig.publish(to_client=True, client_folder=str(self.rig.root / "Elsewhere"))

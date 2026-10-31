@@ -25,7 +25,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-from clark import appfiles, backup, changes, idle, movement_read, page, platform, publish, publish_flow, safety, server, store as clark_store, use_cases_read
+from clark import activity_read, appfiles, backup, changes, idle, movement_read, page, platform, publish, publish_flow, safety, server, sneak, store as clark_store, use_cases_read
 
 DB_NAME = "clark.db"
 HERE = Path(__file__).resolve().parent
@@ -337,7 +337,8 @@ def main(argv=None, out=None, err=None, serve=server.serve, open_url=platform.op
         roots = [] if args.demo else onedrive_roots
         store.close()           # #111: nothing keeps the database open while clark runs (each request opens its own), so Restore can swap the file
         handlers = {"change": change or changes.make_change(store.path, roots),
-                    "undo": undo or changes.make_undo(store.path, roots)}
+                    "undo": undo or changes.make_undo(store.path, roots),
+                    "sneak": sneak.make_read(store.data_for)}
         server.set_open_files(appfiles.open_files())
         server.set_idle(idle.Idle.from_environ(environ) if idle.launched(environ) else None)
         server.set_data_mark(appfiles.data_mark(store.path.parent))
@@ -349,6 +350,7 @@ def main(argv=None, out=None, err=None, serve=server.serve, open_url=platform.op
                      movement=movement_read.make_read(store.milestone_moves, store.data_for),
                      use_cases=use_cases_read.make_read(store.data_for, use_case_ids_on_file(store)),
                      safety=safety.Safety(store.path, roots),
+                     activity=activity_read.make_read(store.path, store.data_for),
                      **handlers)
         if done == 0:
             print("Stopped.", file=out, flush=True)

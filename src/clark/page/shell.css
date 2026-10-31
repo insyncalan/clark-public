@@ -159,6 +159,7 @@ table.items tr.done .t { color: var(--text-muted); }
 .pill.n::before { background: var(--status-grey); }
 .tag { display: inline-flex; font-size: 13px; padding: 1px 7px; border-radius: var(--radius-sm); background: var(--grey-100); color: var(--grey-700); }
 .tag.cl { background: var(--brand-blue-tint); color: var(--status-blue-text); }
+.tag.chg { margin-left: 8px; }
 .type { display: inline-block; padding: 1px 8px; border-radius: var(--radius); font-size: 13px; font-weight: 400; background: var(--grey-100); color: var(--grey-700); }
 .type.k-action { background: var(--brand-blue-tint); color: var(--status-blue-text); }
 .type.k-risk { background: var(--status-amber-tint); color: var(--status-amber-text); }
@@ -351,6 +352,40 @@ input.sec-title { width: 100%; }
 .toast-btn:focus-visible { outline-color: var(--brand-cyan); }
 @media (max-width: 900px) { .modes { margin-left: auto; } .menu { min-width: 220px; } }
 
+/* The peek (#42): a panel on the right edge; its width is dragged from the left edge and kept in this browser. */
+.peek { position: fixed; top: 0; right: 0; bottom: 0; z-index: 30; max-width: 100vw; min-width: min(420px, 100vw); overflow-y: auto; background: var(--surface); border-left: 1px solid var(--grey-200); box-shadow: var(--shadow); padding: 12px 24px 24px; }
+.peek.wide { width: 100%; }
+.pk-edge { position: absolute; left: 0; top: 0; bottom: 0; width: 8px; cursor: ew-resize; touch-action: none; }
+.pk-edge:hover, .pk-edge:focus-visible { background: var(--brand-cyan); opacity: .5; }
+.pk-bar { display: flex; align-items: center; gap: 6px; padding-bottom: 10px; border-bottom: 1px solid var(--grey-100); }
+.pk-sp { flex: 1; }
+.pk-id { color: var(--text-muted); font-size: var(--size-small); margin-left: 6px; }
+.pkp-btn { all: unset; box-sizing: border-box; display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: var(--radius); cursor: pointer; color: var(--text); }
+.pkp-btn:hover:not(:disabled) { background: var(--grey-100); }
+.pkp-btn:focus-visible { outline: 2px solid var(--brand-cyan); outline-offset: 1px; }
+.pkp-btn:disabled { opacity: .35; cursor: default; }
+.pkp-btn[aria-pressed=true] { background: var(--brand-blue-tint); }
+.pkp-btn .i { width: 18px; height: 18px; }
+.pk-title { margin: 16px 0 12px; font-size: var(--size-h2, 20px); font-weight: var(--weight-medium); line-height: 1.3; color: var(--heading); overflow-wrap: anywhere; }
+.pk-fields { margin: 0; }
+.pk-row { display: grid; grid-template-columns: 130px 1fr; gap: 12px; padding: 8px 0; border-top: 1px solid var(--grey-100); }
+.pk-row dt { color: var(--text-muted); font-size: var(--size-small); }
+.pk-row dd { margin: 0; overflow-wrap: anywhere; }
+.wordsbox { margin-top: 20px; padding: 12px; border: 1px solid var(--grey-200); border-radius: var(--radius-lg); background: var(--grey-50); }
+.sn-head { display: flex; align-items: center; gap: 8px; font-size: var(--size-small); color: var(--text-muted); }
+.sn-head .i { width: 16px; height: 16px; }
+.sn-in { width: 100%; box-sizing: border-box; margin-top: 8px; min-height: 36px; padding: 4px 10px; border: 1px solid var(--grey-300); border-radius: var(--radius); background: var(--surface); color: var(--text); font: inherit; }
+.sn-list { list-style: none; margin: 10px 0 0; padding: 0; }
+.sn-list li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; padding: 4px 0; }
+.sn-f { width: 70px; color: var(--text-muted); font-size: var(--size-small); }
+.sn-from { color: var(--text-muted); text-decoration: line-through; }
+.sn-msg { margin: 10px 0 0; color: var(--status-red-text); }
+.sn-confirm { margin: 8px 0 0; }
+.sn-confirm.flash { animation: sn-flash .9s; }
+.pk-row.flash { animation: sn-flash 1.4s; }
+@media (prefers-reduced-motion: reduce) { .pk-row.flash, .sn-confirm.flash { animation: none; background: var(--status-amber-tint); } }
+@keyframes sn-flash { 0%, 60% { background: var(--status-amber-tint); } 100% { background: transparent; } }
+.sn-foot { margin: 10px 0 0; font-size: var(--size-small); }
 /* Work items cells that change in place (#80, Edit only): the cell's content is a button, and its picker opens in one panel under
    it. The panels are the prototype's (.cell-pick, .menu, .cp), in clark's tokens, so dark mode follows. */
 .cell-pick { all: unset; box-sizing: border-box; display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; max-width: 100%; min-height: 28px; padding: 3px 6px; margin: -3px -6px; border-radius: var(--radius-sm); cursor: pointer; }

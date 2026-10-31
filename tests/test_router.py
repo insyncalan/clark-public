@@ -20,6 +20,7 @@ import unittest
 from pathlib import Path
 
 from _paths import ROOT, SRC, TOOLS
+import _testpage as testpage
 
 sys.path.insert(0, str(TOOLS))
 import build_page  # noqa: E402
@@ -521,7 +522,7 @@ class BuiltPage(Browser):
     """The real bundle in a real browser against the harness's server."""
 
     def serve(self):
-        s = Running(data_for=DATA.get, page_html=lambda: page.page_html(tempfile.mkdtemp()))
+        s = Running(data_for=DATA.get, page_html=lambda: testpage.html())
         self.addCleanup(s.close)
         return s
 
@@ -595,6 +596,19 @@ class BuiltPage(Browser):
             self.ev("history.forward()")
             self.until("clarkPage.peek() && clarkPage.peek().id", "A-12", "forward reopened it")
             self.assertEqual(self.tab(), "work")
+
+    def test_back_closes_the_peek_in_one_step_whatever_cards_were_opened_and_a_card_replaces_the_entry(self):
+        # #42 contract (kept by the closePeek rule): Back closes the peek, another card replaces the entry and adds none.
+        with chrome() as cdp:
+            self.draw(cdp, "#work&p=PDF")
+            before = self.at()
+            self.ev("clarkPage.openPeek('A-12')")
+            self.ev("clarkPage.openPeek('A-13')")
+            self.assertEqual(self.at(), ["#work&p=PDF&item=A-13", before[1] + 1], "another card replaced the entry")
+            self.ev("history.back()")
+            self.until("location.hash", "#work&p=PDF", "one Back closed the peek")
+            self.assertIsNone(self.peek())
+            self.no_errors()
 
     def test_closing_a_peek_that_a_click_opened_steps_back_and_leaves_no_entry(self):
         with chrome() as cdp:
@@ -856,10 +870,11 @@ class BuiltPage(Browser):
             self.ev("clarkPage.setFilters('z')")
             self.assertEqual(self.at(), ["#work&p=PDF&item=A-12&f=z", n + 1], "a filter change with a peek open still rewrites")
             self.ev("clarkPage.closePeek()")
-            self.until("location.hash", "#work&p=PDF&f=x%26y", "Back closed the peek, and the entry before it has its own f")
-            self.ev("history.forward()")
-            self.until("clarkPage.filters()", "z", "forward")
-            self.assertEqual(self.peek(), {"kind": "item", "id": "A-12"})
+            self.until("location.hash", "#work&p=PDF&f=z", "a filter changed while it was open stays: the entry is rewritten, not stepped back (#42)")
+            self.assertEqual(self.at()[1], n + 1, "no entry added or lost")
+            self.ev("history.back()")
+            self.until("location.hash", "#work&p=PDF&f=x%26y", "Back goes to the entry before the peek, which has its own f")
+            self.assertIsNone(self.peek())
             self.no_errors()
 
     def test_a_page_or_project_change_pushes_one_entry_and_back_restores_f(self):
@@ -901,7 +916,7 @@ class FileUrl(Browser):
     def test_the_built_page_pushes_hash_only_entries_from_a_file_url(self):
         with tempfile.TemporaryDirectory() as tmp, chrome() as cdp:
             f = Path(tmp) / "page.html"
-            f.write_text(page.PAGE.read_text(encoding="utf-8"), encoding="utf-8")
+            f.write_text(testpage.html(), encoding="utf-8")
             self.cdp = cdp
             self.sid = opened(cdp, f.as_uri() + "#work&p=PDF&item=A-12")
             self.assertTrue(wait(lambda: cdp.js("document.documentElement.dataset.ready", self.sid) == "1"))
@@ -922,7 +937,7 @@ class FileUrl(Browser):
     def test_f_works_from_a_file_url_too(self):
         with tempfile.TemporaryDirectory() as tmp, chrome() as cdp:
             f = Path(tmp) / "page.html"
-            f.write_text(page.PAGE.read_text(encoding="utf-8"), encoding="utf-8")
+            f.write_text(testpage.html(), encoding="utf-8")
             self.cdp = cdp
             self.sid = opened(cdp, f.as_uri() + "#work&p=PDF&f=a%26b")
             self.assertTrue(wait(lambda: cdp.js("document.documentElement.dataset.ready", self.sid) == "1"))

@@ -79,10 +79,10 @@ class Stoppable(sv.LocalServer):
 class Running:
     """A server on a free port in a thread, stopped by close() (which also drops the connections it holds, as stopping would)."""
 
-    def __init__(self, data_for=DEMO.get, page_html=None, projects=lambda: PROJECTS, change=None, undo=None,
+    def __init__(self, data_for=DEMO.get, page_html=None, projects=lambda: PROJECTS, change=None, undo=None, sneak=None,
                  publisher=StubPublisher()):
         self.httpd = Stoppable((sv.HOST, 0), data_for=data_for, page_html=page_html, projects=projects, change=change,
-                               undo=undo, publisher=publisher)
+                               undo=undo, sneak=sneak, publisher=publisher)
         self.port = self.httpd.server_port
         self.httpd.handle_error = self._quiet_when_the_client_leaves(self.httpd.handle_error)
         threading.Thread(target=self.httpd.serve_forever, daemon=True).start()
@@ -272,13 +272,14 @@ class Saving(ServerTest):
             return 409, {"ok": False, "message": "That step has been undone already.", "code": "undone"}
         return Running(change=change, undo=undo)
 
-    def test_the_post_routes_are_exactly_change_undo_the_publish_ones_and_the_two_backup_ones(self):
-        self.assertEqual(set(sv.POST_ROUTES), {"/api/change", "/api/undo", "/api/publish", "/api/client-folder", "/api/preview",
-                                                  "/api/backups/preview", "/api/backups/restore"})     # #43, #111, #147
+    def test_the_post_routes_are_exactly_change_undo_the_sneak_read_the_publish_ones_and_the_two_backup_ones(self):
+        self.assertEqual(set(sv.POST_ROUTES), {"/api/change", "/api/undo", "/api/sneak/read", "/api/publish", "/api/client-folder", "/api/preview",
+                                                  "/api/backups/preview", "/api/backups/restore"})     # #42, #43, #111, #147
+        self.assertEqual(sv.POST_ROUTES["/api/sneak/read"], sv.sneak_route)
         self.assertEqual(sv.POST_ROUTES["/api/change"], sv.change_route)
         self.assertEqual(sv.POST_ROUTES["/api/undo"], sv.undo_route)
-        self.assertEqual(sv.ROUTE_BODY_LIMITS, {"/api/change": 16 * 1024, "/api/undo": 1024, "/api/backups/preview": 1024,
-                                                "/api/backups/restore": 1024})     # #111
+        self.assertEqual(sv.ROUTE_BODY_LIMITS, {"/api/change": 16 * 1024, "/api/undo": 1024, "/api/sneak/read": 4 * 1024,
+                                                "/api/backups/preview": 1024, "/api/backups/restore": 1024})     # #42, #111
         for route in ("/api/save", "/api/changes", "/api/change/", "/api/import"):
             self.assertEqual(self.s.api("POST", route, b"{}")[0], 404, route)
 

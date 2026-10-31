@@ -21,9 +21,10 @@ from pathlib import Path
 from unittest import mock
 
 from _demo import USER, DemoStore
+import _testpage as testpage
 import _publish_fixture as fx
 
-from clark import changes, order, page, publish, server as sv
+from clark import changes, order, publish, server as sv
 from clark.store import open_store
 from test_page import navigate
 from test_server import Running, _Pipe, chrome, wait
@@ -58,7 +59,7 @@ class Editor(unittest.TestCase):
                 self.sent.append(which)
                 return real(req)
             return call
-        self.s = Running(data_for=self.store.data_for, page_html=lambda: page.page_html(EMPTY_BRANDING),
+        self.s = Running(data_for=self.store.data_for, page_html=lambda: testpage.html(),
                          change=seam(real_change, "change"), undo=seam(real_undo, "undo"))
         self.addCleanup(self.s.close)
         quiet = mock.patch.object(sv.LOG, "disabled", True)

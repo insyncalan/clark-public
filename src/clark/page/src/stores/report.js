@@ -46,6 +46,8 @@ export const counts = computed(() => {
   return d ? { work: d.actions.length + d.raid.length + d.decisions.length, milestones: d.milestones.length } : { work: 0, milestones: 0 };
 });
 
+let openedF = null;                                  // null: not known (a reload or a restored tab), so closing rewrites the entry
+
 const where = () => ({ view: view.value, project: project.value, item: item.value, ms: ms.value, f: filterText.value });
 
 // Draw the page from an address: the signals follow it, and a project that changed is read again. A published file has one
@@ -119,6 +121,7 @@ export function openWork(state) {
 /** Open a work item's or a milestone's peek (`kind` "milestone" or "item"; left out, the project's data says which): one new entry; with a peek already open, this entry is rewritten (Previous, Next, another row). An id the loaded data doesn't have does nothing. */
 export function openPeek(id, kind) {
   const d = data.value;
+  if (!peek.value) openedF = filterText.value;           // the filters as they were when the peek opened: closing steps Back only if they still are
   const milestone = kind ? kind === "milestone" : known(d, id, true);
   if (d && !known(d, id, milestone)) return;               // with no data loaded there is nothing to check it against: open it
   go({ ...where(), item: milestone ? "" : id, ms: milestone ? id : "" }, { replace: !!peek.value });
@@ -129,7 +132,8 @@ export function openPeek(id, kind) {
 export function closePeek() {
   if (!peek.value) return;
   const rewrite = () => go({ ...where(), item: "", ms: "" }, { replace: true });
-  if (route.peekWasPushed() && route.back(rewrite)) return;       // onPop redraws
+  // Back would also take away a filter changed while the peek was open (that change rewrote this entry), so then the entry is rewritten.
+  if (route.peekWasPushed() && openedF === filterText.value && route.back(rewrite)) return;       // onPop redraws
   rewrite();
 }
 
