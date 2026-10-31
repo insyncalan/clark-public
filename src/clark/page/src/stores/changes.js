@@ -3,7 +3,7 @@
 // the page is what clark saved. A failed change draws nothing and the toast says why, in plain words (api.js).
 import { signal } from "@preact/signals";
 import { data, project, reread } from "./report.js";
-import { sendChange, sendUndo, sendItemChange, sendCellChange, sendMilestoneChange } from "../api.js";
+import { sendChange, sendUndo, sendItemChange, sendRecordChange, sendCellChange, sendMilestoneChange } from "../api.js";
 
 // null, or { id, kind: "done" | "note" | "problem", text, undo: the step's id or null, code: the project the step was made in }
 export const toast = signal(null);
@@ -84,6 +84,21 @@ export function changeItem(req, done) {
     const step = r.reply.undoable === false ? null : r.reply.apply_id;
     if (step) itemSteps.set(step, "");
     say("done", done, step, code);
+    return r.reply;
+  });
+}
+
+// Archive an item or add a copy of it (#97), from the right-click menu: one step with Undo (`req` is the change, `done.text` what the
+// toast says and `done.back` what it says after the Undo, "" for "Undone."). The work items are read again, as after a board move.
+// A refusal is a note: nothing was changed.
+export function changeRecord(req, done) {
+  const code = project.value;
+  return enqueue(async () => {
+    const r = await sendRecordChange(code, req);
+    if (!r.ok) { say("note", r.message); return null; }
+    await reread(code);
+    itemSteps.set(r.reply.apply_id, done.back || "");
+    say("done", done.text, r.reply.apply_id, code);
     return r.reply;
   });
 }

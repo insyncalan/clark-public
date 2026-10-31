@@ -28,7 +28,7 @@ export function MenuPanel({ label, id, cls, anchor, onClose, boxRef, children })
   const own = useRef(null), box = boxRef || own;
   const closeRef = useRef(onClose); closeRef.current = onClose;
   useLayoutEffect(() => { (menuItemsIn(box.current)[0] || box.current).focus({ preventScroll: true }); }, []);
-  useEffect(() => {
+  useLayoutEffect(() => {                        // not after the next frame: a click away that quick still closes it
     const away = (e) => { if (!box.current.contains(e.target) && !(anchor && anchor.contains(e.target))) closeRef.current("away"); };
     document.addEventListener("pointerdown", away, true);
     return () => document.removeEventListener("pointerdown", away, true);

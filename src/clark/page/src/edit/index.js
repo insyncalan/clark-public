@@ -16,8 +16,9 @@ import { Movement } from "./Movement.jsx";
 import { RichField } from "./RichField.jsx";
 import { richOn } from "./richSave.js";
 import { Safety } from "./Safety.jsx";
+import { RowMenu } from "./RowMenu.jsx";
 import { HelpLayer } from "../help/Help.jsx";
 import { installKeys, openHelp, closeHelp, helpOpen } from "../help/helpStore.js";
 
 // Help (#82) is among them: a published file has no Help panel and no "?" key.
-export const EDIT = { glance: GLANCE, Personal, RichField, richOn, Gutter, Add, Title, Toggle, Toast, Cell, Publish, ProfileMenu, ClientFolder, Safety, MilestoneMore: Movement, Board, LayoutSwitch, HelpLayer, help: { open: openHelp, close: closeHelp, isOpen: () => helpOpen.value, installKeys } };
+export const EDIT = { glance: GLANCE, Personal, RichField, richOn, Gutter, Add, Title, Toggle, Toast, Cell, Publish, ProfileMenu, ClientFolder, Safety, MilestoneMore: Movement, Board, LayoutSwitch, RowMenu, HelpLayer, help: { open: openHelp, close: closeHelp, isOpen: () => helpOpen.value, installKeys } };

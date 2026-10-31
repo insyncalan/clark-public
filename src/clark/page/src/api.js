@@ -31,7 +31,7 @@ async function post(path, body, fits = hasSections) {
 
 // A work item change (#68): the reply carries the changed row, not the sections. The server's refusals of these are fixed plain
 // sentences (changes.py), so a short one is shown as it is; anything else gets plainChange's words.
-async function postItem(path, body) {
+async function postItem(path, body, fits = (r) => !!r.item) {
   try {
     const r = await fetch(path, {
       method: "POST",
@@ -40,7 +40,7 @@ async function postItem(path, body) {
       cache: "no-store",
     });
     const reply = await r.json().catch(() => null);
-    if (r.ok && reply && reply.ok === true && reply.item) return { ok: true, reply };
+    if (r.ok && reply && reply.ok === true && fits(reply)) return { ok: true, reply };
     const said = reply && typeof reply.message === "string" ? reply.message : "";
     const mine = (r.status === 400 || r.status === 409) && said && said.length <= 200 && !/[\u0000-\u001f]/.test(said);
     return { ok: false, message: mine ? said : plainChange(r.ok ? 500 : r.status, reply) };
@@ -48,6 +48,9 @@ async function postItem(path, body) {
     return { ok: false, message: plainChange(0) };
   }
 }
+
+// An archive, or a copy of an item (#97): the reply says the step (apply_id) and the record, with no sections.
+export const sendRecordChange = (project, req) => postItem("/api/change", { ...req, project }, (r) => typeof r.apply_id === "number");
 
 // `req` is the change's own parts: op, id, values, changes, before, after, place (see clark/changes.py). `kind` is report_sections
 // unless the request says otherwise (#45: glance_tiles and projects reply with tiles or the project, not the sections).

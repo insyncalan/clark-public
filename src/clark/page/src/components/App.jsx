@@ -10,6 +10,7 @@ const PAGES = { dashboard: Dashboard, work: WorkItems, milestones: Milestones, s
 export function App({ tools }) {
   const Page = PAGES[view.value];
   const Toast = tools && tools.Toast;
+  const RowMenu = tools && tools.RowMenu;               // the right-click menu on a work item (#97); a published file has none
   const Layer = tools && tools.HelpLayer;                // Help (#82) sits over the open page; a published file has none
   const body = status.value === "ready" ? <Page tools={tools} /> : <Gate />;
   return (
@@ -17,6 +18,7 @@ export function App({ tools }) {
       <TopBar tools={tools} />
       <main id="main">{Layer ? <Layer>{body}</Layer> : body}</main>
       {Toast ? <Toast /> : null}
+      {RowMenu ? <RowMenu /> : null}
     </>
   );
 }
