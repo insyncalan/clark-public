@@ -195,13 +195,13 @@ let reading = 0;                                       // the newest read wins w
 // What the page says when clark could not give the data. The page never shows the server's own text, because it might be a
 // program's error name or a technical phrase: it looks the server's message up here by the HTTP status, and a message it does not
 // know (or none at all) gets the plain fallback for that status. Every line says what to do next. A status of 0 is "no answer".
-const READ_FAILED = "clark could not read this project. Reload the page. If it happens again, restart clark.";
-const STALE = "clark was restarted after you opened this page. Reload the page and try again.";
+const READ_FAILED = "This project could not be read. Reload the page. If it happens again, restart clark.";
+const STALE = "This page is out of date: clark was restarted after you opened it. Reload the page and try again.";
 const BAD_CODE = "Use a project code of 3 to 7 capital letters or digits.";
 const NO_PROJECT = "There is no project with that code. Check the code in the address, or choose a project from the list.";
-const NOT_ACCEPTED = "clark did not accept that request. Reload the page.";
+const NOT_ACCEPTED = "That request was not accepted. Reload the page.";
 const ALLOWED = {
-  400: { fallback: "clark could not read that request. Reload the page.",
+  400: { fallback: "That request could not be read. Reload the page.",
          known: { [BAD_CODE]: BAD_CODE } },
   403: { fallback: NOT_ACCEPTED,
          known: { "Not allowed": NOT_ACCEPTED, [NOT_ACCEPTED]: NOT_ACCEPTED, [STALE]: STALE,
@@ -209,8 +209,8 @@ const ALLOWED = {
   404: { fallback: "Check the project's code.",
          known: { [NO_PROJECT]: NO_PROJECT,
                   "There is no project with that code.": NO_PROJECT } },
-  500: { fallback: "clark hit a problem reading this project. Reload the page. If it happens again, restart clark.", known: {} },
-  0: { fallback: "clark has stopped. It stops by itself after a while with nothing open. Start it again from clark.command.", known: {} },
+  500: { fallback: "A problem came up reading this project. Reload the page. If it happens again, restart clark.", known: {} },
+  0: { fallback: "Nothing is running behind this page: clark stops by itself after a while with nothing open. Start it again from clark.command.", known: {} },
 };
 export function plain(code, body) {
   const row = ALLOWED[code];
@@ -223,7 +223,7 @@ export function plain(code, body) {
 // What the page says when a change or an undo (api.js) failed, by the same rule as plain(): the status picks the words, and a
 // message from the server is used only to pick one of these, never shown. Each says that nothing was changed (or what is
 // still true) and what to do next.
-const CHANGE_FAILED = "clark could not make that change, and nothing was changed. Reload the page and try again.";
+const CHANGE_FAILED = "That change could not be made, and nothing was changed. Reload the page and try again.";
 const CHANGE_KNOWN = {
   "Your page is out of date. Reload it, then try again.": "The report has changed since you opened it, and nothing was changed. Reload the page and try again.",
   "That section isn't in this project.": "That section is no longer in this report, and nothing was changed. Reload the page.",
@@ -247,13 +247,13 @@ export function plainChange(code, body) {
   const known = Object.prototype.hasOwnProperty.call(CHANGE_KNOWN, said) ? CHANGE_KNOWN[said] : "";
   if (code === 400 || code === 409) return known || CHANGE_FAILED;
   if (code === 403 || code === 0) return plain(code, body);
-  if (code === 404) return "clark could not find this project, and nothing was changed. Check the code in the address, then reload the page.";
-  if (code === 500) return "clark hit a problem saving that, and nothing was changed. Try again. If it happens again, restart clark.";
-  if (code === 503) return "clark could not save just now, and nothing was changed. Wait a moment and try again. If it keeps happening, restart clark.";
+  if (code === 404) return "This project could not be found, and nothing was changed. Check the code in the address, then reload the page.";
+  if (code === 500) return "A problem came up saving that, and nothing was changed. Try again. If it happens again, restart clark.";
+  if (code === 503) return "That could not be saved just now, and nothing was changed. Wait a moment and try again. If it keeps happening, restart clark.";
   return CHANGE_FAILED;
 }
 
-const LIST_FAILED = "clark could not read the list of projects. Reload the page. If it happens again, restart clark.";
+const LIST_FAILED = "The list of projects could not be read. Reload the page. If it happens again, restart clark.";
 // The list's own words, picked by status like plain(): a refusal or no answer says what plain() says; anything else is LIST_FAILED.
 function plainList(code, body) {
   return code === 0 || code === 400 || code === 403 ? plain(code, body) : LIST_FAILED;

@@ -788,7 +788,7 @@ class Sections(Base):
 
 class Failures(Base):
     """Every failure says plain words and nothing the server said; nothing is drawn that was not saved."""
-    STALE = "clark was restarted after you opened this page. Reload the page and try again."
+    STALE = "This page is out of date: clark was restarted after you opened it. Reload the page and try again."
 
     def shown_problem(self, p, words):
         p.until(f"!!document.querySelector('.toast.problem') && document.querySelector('.toast-text').textContent === {json.dumps(words)}",
@@ -814,14 +814,14 @@ class Failures(Base):
             p.edit()
             self.failure = lambda req: (400, {"ok": False, "message": SECRET, "code": "refused"})
             p.menu("ABC-S-002", "up")
-            self.shown_problem(p, "clark could not make that change, and nothing was changed. Reload the page and try again.")
+            self.shown_problem(p, "That change could not be made, and nothing was changed. Reload the page and try again.")
             self.assertEqual(p.ids(), IDS)
             self.failure = lambda req: (400, {"ok": False, "message": "Your page is out of date. Reload it, then try again.", "code": "refused"})
             p.menu("ABC-S-002", "up")
             self.shown_problem(p, "The report has changed since you opened it, and nothing was changed. Reload the page and try again.")
 
     def test_a_500_and_a_fault(self):
-        words = "clark hit a problem saving that, and nothing was changed. Try again. If it happens again, restart clark."
+        words = "A problem came up saving that, and nothing was changed. Try again. If it happens again, restart clark."
         with chrome() as cdp:
             p = self.visit(cdp)
             p.edit()
@@ -844,7 +844,7 @@ class Failures(Base):
             p.edit()
             self.failure = lambda req: (503, {"ok": False, "message": SECRET})
             p.menu("ABC-S-002", "up")
-            self.shown_problem(p, "clark could not save just now, and nothing was changed. Wait a moment and try again. "
+            self.shown_problem(p, "That could not be saved just now, and nothing was changed. Wait a moment and try again. "
                                   "If it keeps happening, restart clark.")
             self.failure = lambda req: (409, {"ok": False, "message": "That step has been undone already."})
             p.js("document.querySelector('[data-dismiss]').click()")
@@ -858,7 +858,7 @@ class Failures(Base):
             self.s.close()                                                        # clark's window was closed
             self.addCleanup(lambda: None)
             p.menu("ABC-S-002", "up")
-            self.shown_problem(p, "clark has stopped. It stops by itself after a while with nothing open. Start it again from clark.command.")
+            self.shown_problem(p, "Nothing is running behind this page: clark stops by itself after a while with nothing open. Start it again from clark.command.")
             self.assertEqual(p.ids(), IDS)
 
     def test_changes_go_out_one_at_a_time(self):

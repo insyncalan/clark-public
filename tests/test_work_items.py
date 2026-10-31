@@ -348,7 +348,7 @@ class RealBrowser(unittest.TestCase):
         s = self.serve(projects=broken)
         with chrome() as cdp, self.assertLogs(sv.LOG, "ERROR"):
             sid = self.load_page(cdp, s.port, 1400, "#work")
-            self.assertTrue(wait(lambda: "clark could not read the list of projects. Reload the page. If it happens again, restart clark." in (cdp.js("document.querySelector('main').innerText", sid) or "")))
+            self.assertTrue(wait(lambda: "The list of projects could not be read. Reload the page. If it happens again, restart clark." in (cdp.js("document.querySelector('main').innerText", sid) or "")))
             text = cdp.js("document.querySelector('main').innerText", sid)
             self.assertNotIn("There are no projects yet.", text)
             self.assertNotIn("the store is not there", text)
@@ -381,7 +381,7 @@ class RealBrowser(unittest.TestCase):
         with mock.patch.object(sv, "with_boot", lambda html: real(html).replace(sv.TOKEN, "an-old-token")):
             with chrome() as cdp:                                                   # a page from before a restart
                 sid = self.load_page(cdp, s.port, 1400, "#work&p=TUL")
-                self.assertTrue(wait(lambda: "clark was restarted after you opened this page. Reload the page and try again." in
+                self.assertTrue(wait(lambda: "This page is out of date: clark was restarted after you opened it. Reload the page and try again." in
                                      (cdp.js("document.querySelector('main').innerText", sid) or "")), "the page's own words, not the server's")
                 self.assertNotIn(sv.STALE_PAGE, cdp.js("document.querySelector('main').innerText", sid))
                 self.assertEqual(cdp.js("document.querySelectorAll('main button').length", sid), 1, "Try again")
@@ -397,7 +397,7 @@ class RealBrowser(unittest.TestCase):
             sid = self.load_page(cdp, s2.port, 1400, "#work&p=TUL")
             self.assertTrue(wait(lambda: cdp.js("document.querySelector('main h1') && document.querySelector('main h1').textContent", sid) == "Something went wrong"))
             self.assertNotIn("the store is not there", cdp.js("document.querySelector('main').innerText", sid))
-            self.assertIn("clark hit a problem reading this project. Reload the page. If it happens again, restart clark.",
+            self.assertIn("A problem came up reading this project. Reload the page. If it happens again, restart clark.",
                           cdp.js("document.querySelector('main').innerText", sid))
             broken[0] = False
             cdp.js("[...document.querySelectorAll('main button')].find(b => b.textContent === 'Try again').click()", sid)
@@ -410,7 +410,7 @@ class RealBrowser(unittest.TestCase):
             self.assertTrue(wait(lambda: cdp.js("document.querySelectorAll('main li button').length", sid) == 2))
             s.close()                                                               # clark goes away; then a project is chosen
             cdp.js("document.querySelector('main li button').click()", sid)
-            self.assertTrue(wait(lambda: "clark has stopped. It stops by itself after a while with nothing open. Start it again from clark.command." in
+            self.assertTrue(wait(lambda: "Nothing is running behind this page: clark stops by itself after a while with nothing open. Start it again from clark.command." in
                                  (cdp.js("document.querySelector('main').innerText", sid) or "")))
 
     def test_a_project_with_no_work_items_says_so(self):
