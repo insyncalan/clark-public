@@ -582,3 +582,98 @@ def run_stoppable(args, data, env, limit, max_out, stop=None, prefix="clark-run-
                 except (OSError, ValueError, AttributeError):
                     pass
         shutil.rmtree(work, ignore_errors=True)
+
+
+# The key store (#54): where an AI provider's API key is kept. Only the macOS Keychain is built; any other system answers "not
+# connected" (NotBuiltStore), so a key is never kept in a file. The key never goes into clark's database, settings, logs, history,
+# error text or the page, and never onto a command line: `security` runs from a fixed argument list (no shell) and `put` hands it
+# the whole command, key included, on standard input through its interactive mode (`security -i`), which reads commands from
+# there. `has` never reads the secret. Standard error is thrown away (run_stoppable) and no failure carries the program's words.
+SECURITY = "/usr/bin/security"
+KEY_ACCOUNT = "clark"
+KEY_SHAPE = re.compile(r"[A-Za-z0-9_-]{20,256}")         # every key clark keeps; nothing in it needs quoting on security's line
+KEY_SERVICE = re.compile(r"clark\.ai\.[0-9a-f]{16}\.[a-z]{2,16}")
+KEY_LIMIT = 15.0                                        # seconds for one keychain step
+KEY_MAX_OUT = 4096
+NOT_FOUND = 44                                          # security's exit code for "The specified item could not be found"
+KEY_NOT_SAVED = "The key could not be kept in this Mac's keychain. Nothing was saved. Try again; if it keeps happening, restart clark."
+KEY_NOT_REMOVED = "The key could not be taken out of this Mac's keychain. Open Keychain Access and delete it there, then try again."
+
+
+class KeyStore:
+    """The interface: `has(service)` (True or False, never reading the secret), `put(service, key)`, `remove(service)` (True when
+    there is no item afterwards) and `peek(service)` (the key, or None). `put` and `remove` raise PlatformError with fixed words."""
+    built = False
+
+    def has(self, service):
+        return False
+
+    def put(self, service, key):
+        raise NotBuiltYet("Keeping a key on this system isn't built yet. Nothing was saved.")
+
+    def remove(self, service):
+        return True
+
+    def peek(self, service):
+        return None
+
+
+class NotBuiltStore(KeyStore):
+    """Every system but macOS until its own store is written (Windows: Credential Manager, later): never connected."""
+
+
+def _key_env():
+    env = {"PATH": "/usr/bin:/bin", "LANG": "en_GB.UTF-8"}
+    home = os.path.expanduser("~")
+    if home and home != "~":
+        env["HOME"] = home
+    return env
+
+
+class MacKeychain(KeyStore):
+    """The login keychain through /usr/bin/security. `run` is a seam for the tests (run_stoppable's shape); no test uses the real
+    keychain."""
+    built = True
+
+    def __init__(self, run=None, program=SECURITY):
+        self.run = run or run_stoppable
+        self.program = program
+
+    def _step(self, args, data=b""):
+        return self.run([self.program, *args], data, _key_env(), KEY_LIMIT, KEY_MAX_OUT, prefix="clark-key-")
+
+    def _service(self, service):
+        if not isinstance(service, str) or not KEY_SERVICE.fullmatch(service):
+            raise PlatformError("That isn't a key clark keeps. Nothing was changed.")
+        return service
+
+    def has(self, service):
+        status, _out, code = self._step(["find-generic-password", "-s", self._service(service), "-a", KEY_ACCOUNT])
+        return status == "ok" and code == 0
+
+    def put(self, service, key):
+        service = self._service(service)
+        if not isinstance(key, str) or not KEY_SHAPE.fullmatch(key):
+            raise PlatformError(KEY_NOT_SAVED)
+        line = f"add-generic-password -U -s {service} -a {KEY_ACCOUNT} -w {key}\n".encode("ascii")
+        status, _out, code = self._step(["-i"], line)
+        if status != "ok" or code != 0:
+            raise PlatformError(KEY_NOT_SAVED)
+
+    def remove(self, service):
+        status, _out, code = self._step(["delete-generic-password", "-s", self._service(service), "-a", KEY_ACCOUNT])
+        if (status == "ok" and code == 0) or code == NOT_FOUND:
+            return True
+        raise PlatformError(KEY_NOT_REMOVED)
+
+    def peek(self, service):
+        status, out, code = self._step(["find-generic-password", "-s", self._service(service), "-a", KEY_ACCOUNT, "-w"])
+        if status != "ok" or code != 0:
+            return None
+        key = out.decode("ascii", "replace").strip()
+        return key if KEY_SHAPE.fullmatch(key) else None
+
+
+def key_store(on=None):
+    """This system's key store: the Mac Keychain on macOS, otherwise one that is never connected."""
+    return MacKeychain() if (on or system()) == MAC else NotBuiltStore()

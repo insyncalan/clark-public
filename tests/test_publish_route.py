@@ -855,10 +855,12 @@ class OnlyOneRouteWritesIntoTheClientFolder(Base):
         self.assertEqual(self.rig.listing(self.rig.client), [])
 
     def test_every_route_is_listed_and_the_set_is_what_the_issue_expects(self):
-        self.assertEqual(sorted(sv.POST_ROUTES), ["/api/ask", "/api/ask-enabled", "/api/ask-folders", "/api/ask/stop", "/api/backups/preview", "/api/backups/restore",
+        self.assertEqual(sorted(sv.POST_ROUTES), ["/api/ai/choose", "/api/ai/connect", "/api/ai/disconnect", "/api/ai/models",
+                                                  "/api/ask", "/api/ask-enabled", "/api/ask-folders", "/api/ask/change/apply",
+                                                  "/api/ask/change/dry", "/api/ask/stop", "/api/backups/preview", "/api/backups/restore",
                                                   "/api/change", "/api/client-folder", "/api/preview", "/api/publish", "/api/undo"])
         # #111: the two backup routes; #147: preview; #47: asking, its switch and its folders (none writes a file)
-        self.assertEqual(sorted(sv.GET_ROUTES), ["/api/ask-enabled", "/api/ask-folders", "/api/ask/status", "/api/backups", "/api/data", "/api/export",
+        self.assertEqual(sorted(sv.GET_ROUTES), ["/api/ai/status", "/api/ask-enabled", "/api/ask-folders", "/api/ask/status", "/api/backups", "/api/data", "/api/export",
                                                  "/api/movement", "/api/projects", "/api/publication", "/api/use-cases"])     # #147: export; #136: movement
 
     def test_no_route_takes_the_client_folder_from_the_request(self):

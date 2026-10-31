@@ -168,7 +168,11 @@ class AskService:
         reply = ask.ask_provider(self.provider, request, codes=(code,), exists=lambda ref: ref in facts,
                                  facts=lambda ref: facts.get(ref))
         if isinstance(reply, ask.Failure):
-            return 200, {"ok": False, "code": "no_answer", "message": reply.message}
+            out = {"ok": False, "code": "no_answer", "message": reply.message}
+            offer = getattr(reply, "offer", ())       # #54: a limit offers other models; the person chooses, nothing switches
+            if offer:
+                out["code"], out["offer"] = "limit", [dict(o) for o in offer]
+            return 200, out
         notes = [n for n in (ask.dropped_note(request.dropped_turns),
                              left_out_note(data.left_out + found.left_out), *folder_notes(found)) if n]
         folder_ids = {pid for pid, _label in request.passages[len(data.passages):]}

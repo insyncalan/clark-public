@@ -182,7 +182,8 @@ class Words(unittest.TestCase):
                                   "Turn on asking", "Folders asking may read",
                                   "Asking may read the files in these folders, as well as this project's own data. It only reads: it never changes a file. "
                                   "Parts of the files in these folders can be sent to Claude, which Anthropic runs, when they help answer a question.",
-                                  "Choosing folders isn't ready on this computer yet. Asking uses only this project's data until it is."])
+                                  "Choosing folders isn't ready on this computer yet. Asking uses only this project's data until it is.",
+                                  "AI", "The AI settings could not be read just now. Reload the page to try again."])     # #54
         self.fake.mode = "wait"
         with chrome() as cdp:
             sid = self.visit(cdp)

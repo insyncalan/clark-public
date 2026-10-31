@@ -23,6 +23,9 @@ Routes:
 - POST /api/backups/restore  {name, last_step}: put a backup back (one writer at a time, never waiting)
 - POST /api/ask/change/dry    {project, reply}: the dry run of the changes an answer suggested, held on the server (#47e; ask_service.py)
 - POST /api/ask/change/apply  {project, offer, confirm?}: one offer saved as one undoable step (#47e; ask_apply.py, changes.make_ask_change)
+- GET  /api/ai/status     Settings › AI (#54; ai_service.py): the provider cards and the model list; never a key
+- POST /api/ai/connect    {provider, method, key?}: test the sign-in and keep the key in the key store only; /api/ai/models,
+                          /api/ai/choose and /api/ai/disconnect: the ticked models, the model in use, and Disconnect
 - POST /csp-report       the browser's reports of what the script policy blocked: local only, rate-limited, small
 
 Run: python3 -m clark.server   (CLARK_PORT sets the port; the default is 8766, beside creaite's 8765)
@@ -76,7 +79,8 @@ ERROR_PAGES = {501: "not_supported", 505: "bad_request", 414: "too_large", 431: 
 BODY_LIMIT = 2 * 1024 * 1024          # any request; a route that needs more (an import) adds itself below
 ROUTE_BODY_LIMITS = {"/api/change": 16 * 1024, "/api/undo": 1024, "/api/backups/preview": 1024, "/api/backups/restore": 1024,
                      "/api/ask-folders": 4096, "/api/ask-enabled": 1024, "/api/ask": 128 * 1024, "/api/ask/stop": 1024,
-                     "/api/ask/change/dry": 1024, "/api/ask/change/apply": 1024}     # #65: a change or an undo is small; over is the 400 "too big"
+                     "/api/ask/change/dry": 1024, "/api/ask/change/apply": 1024,
+                     "/api/ai/connect": 2048, "/api/ai/models": 4096, "/api/ai/choose": 1024, "/api/ai/disconnect": 1024}     # #65: a change or an undo is small; over is the 400 "too big"
 PROJECT_CODE = re.compile(r"[A-Z][A-Z0-9]{2,6}")      # creaite's projects.code CHECK: 3 to 7 characters
 CLIENT_LEFT = (BrokenPipeError, ConnectionResetError)  # the page went mid-reply: not a 500
 
@@ -606,16 +610,32 @@ def ask_route(method):
     return route
 
 
+def ai_route(method):
+    """GET /api/ai/status and POST /api/ai/connect, /models, /choose and /disconnect (#54): Settings › AI. The server's `ai`
+    (ai_service.AiService) answers (status, body); without one there is nothing to ask: not found. The token, the Host, the Origin,
+    JSON only and the length are checked before this runs. No answer holds a key, and no body is logged."""
+    def route(handler, *req):
+        service = getattr(handler.server, "ai", None)
+        if service is None:
+            return handler.send(404, error_body("not_found"))
+        status, body = getattr(service, method)(*req)
+        return handler.send(status, body)
+    return route
+
+
 GET_ROUTES = {"/api/projects": projects_route, "/api/data": data_route, "/api/publication": publisher_route("latest"),
               "/api/export": export_route, "/api/use-cases": use_cases_route, "/api/backups": safety_route("listing"),
               "/api/movement": movement_route, "/api/ask-folders": ask_folders_route("read"),
-              "/api/ask-enabled": app_settings_route("read_ask"), "/api/ask/status": ask_route("status")}
+              "/api/ask-enabled": app_settings_route("read_ask"), "/api/ask/status": ask_route("status"),
+              "/api/ai/status": ai_route("status")}
 POST_ROUTES = {"/api/change": change_route, "/api/undo": undo_route, "/api/publish": publisher_route("publish"),
                "/api/client-folder": publisher_route("client_folder"), "/api/preview": publisher_route("preview"),
                "/api/backups/preview": safety_route("preview"), "/api/backups/restore": safety_route("restore"),
                "/api/ask-folders": ask_folders_route("change"), "/api/ask-enabled": app_settings_route("change_ask"),
                "/api/ask": ask_route("ask"), "/api/ask/stop": ask_route("stop"),
-               "/api/ask/change/dry": ask_route("change_dry"), "/api/ask/change/apply": ask_route("change_apply")}     # later items: /api/import
+               "/api/ask/change/dry": ask_route("change_dry"), "/api/ask/change/apply": ask_route("change_apply"),
+               "/api/ai/connect": ai_route("connect"), "/api/ai/models": ai_route("models"),
+               "/api/ai/choose": ai_route("choose"), "/api/ai/disconnect": ai_route("disconnect")}     # later items: /api/import
 # ===== end of the page and the data =====
 
 
@@ -796,7 +816,7 @@ class LocalServer(ThreadingHTTPServer):
     daemon_threads = True
 
     def __init__(self, server_address, handler=Handler, data_for=None, page_html=None, projects=None, change=None, undo=None,
-                 publisher=None, movement=None, use_cases=None, safety=None, ask_folders=None, app_settings=None, ask=None):
+                 publisher=None, movement=None, use_cases=None, safety=None, ask_folders=None, app_settings=None, ask=None, ai=None):
         if server_address[0] != HOST:
             raise ValueError(f"The server listens on {HOST} only, not {server_address[0]}")
         self.data_for = data_for or (lambda code: None)
@@ -810,6 +830,7 @@ class LocalServer(ThreadingHTTPServer):
         self.ask_folders = ask_folders        # ask_folders.AskFolders (#47); None: the folder routes answer 404
         self.app_settings = app_settings      # app_settings.AppSettings (#47): the ask switch; None: its route answers 404
         self.ask = ask                        # ask_service.AskService (#47): questions; None: the ask routes answer 404
+        self.ai = ai                          # ai_service.AiService (#54): Settings › AI; None: the /api/ai/ routes answer 404
         super().__init__(server_address, handler)
 
     def server_bind(self):
@@ -841,14 +862,14 @@ def wait_for_jobs(limit=JOB_WAIT_LIMIT, sleep=time.sleep):
 
 
 def serve(port=None, data_for=None, page_html=None, projects=None, out=None, err=None, change=None, undo=None,
-          publisher=None, movement=None, use_cases=None, safety=None, ask_folders=None, app_settings=None, ask=None):
+          publisher=None, movement=None, use_cases=None, safety=None, ask_folders=None, app_settings=None, ask=None, ai=None):
     """Start the server on 127.0.0.1 and serve until stopped. A port in use is one plain line and exit code 1."""
     out, err = out or sys.stdout, err or sys.stderr
     port = port_setting() if port is None else port
     try:
         httpd = LocalServer((HOST, port), data_for=data_for, page_html=page_html, projects=projects, change=change, undo=undo,
                             publisher=publisher, movement=movement, use_cases=use_cases, safety=safety, ask_folders=ask_folders,
-                            app_settings=app_settings, ask=ask)
+                            app_settings=app_settings, ask=ask, ai=ai)
     except OSError as e:
         if e.errno == errno.EADDRINUSE:
             print(PORT_TAKEN, file=err)

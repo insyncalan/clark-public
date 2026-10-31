@@ -25,7 +25,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-from clark import app_settings, appfiles, ask_claude, ask_folders, ask_service, backup, changes, idle, movement_read, page, platform, publish, publish_flow, safety, server, store as clark_store, use_cases_read
+from clark import ai_service, app_settings, appfiles, ask_claude, ask_folders, ask_service, backup, changes, idle, movement_read, page, platform, providers, publish, publish_flow, safety, server, store as clark_store, use_cases_read
 
 DB_NAME = "clark.db"
 HERE = Path(__file__).resolve().parent
@@ -342,6 +342,8 @@ def main(argv=None, out=None, err=None, serve=server.serve, open_url=platform.op
         server.set_idle(idle.Idle.from_environ(environ) if idle.launched(environ) else None)
         server.set_data_mark(appfiles.data_mark(store.path.parent))
         shown = ServerOutput(out, code, open_url if args.open else None, err)
+        ai = providers.build(store.path.parent, ask_claude.ClaudeCommand())       # #54: the routes to a model (Settings › AI)
+        asking = ask_service.AskService(store.path, providers.RoutedProvider(ai), roots)
         done = serve(port=port, data_for=store.data_for, page_html=page.page_html,
                      projects=projects_of(store.path, roots), out=shown,
                      err=err,
@@ -351,7 +353,7 @@ def main(argv=None, out=None, err=None, serve=server.serve, open_url=platform.op
                      safety=safety.Safety(store.path, roots),
                      ask_folders=ask_folders.AskFolders(store.path, roots, data_dir=store.path.parent),
                      app_settings=app_settings.AppSettings(store.path, roots),
-                     ask=ask_service.AskService(store.path, ask_claude.ClaudeCommand(), roots),
+                     ask=asking, ai=ai_service.AiService(ai, asking.enabled),
                      **handlers)
         if done == 0:
             print("Stopped.", file=out, flush=True)

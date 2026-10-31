@@ -7,6 +7,7 @@ import { words } from "./publishApi.js";
 import { panelOpen, panelState, panelModel, panelWidth, panelFocus, turns, pending, closePanel, setWidth, clampWidth, nextQuip, quipDelay } from "./askPanelState.js";
 import * as W from "./askWords.js";
 import { ChangeCards, fixedLine } from "./AskChange.jsx";
+import { AskOffer } from "./AskOffer.jsx";
 
 async function post(path, body) {
   try {
@@ -62,6 +63,7 @@ export function AskPanel() {
     } else {
       const m = r.status === 200 && !(b && typeof b.message === "string" && b.message) ? W.NO_ANSWER_LINE : words(r, "answer");
       turns.value = [...turns.value, { role: "assistant", text: m, kind: "problem" }];
+      if (b && b.code === "limit" && Array.isArray(b.offer) && b.offer.length) turns.value = [...turns.value, { role: "assistant", text: "", kind: "offer", offer: b.offer.slice(0, 6) }];   // #54
     }
   }
 
@@ -120,7 +122,7 @@ export function AskPanel() {
         {list.map((t, i) => (
           <div key={i} class={`ask-turn ${t.role}${t.kind ? " " + t.kind : ""}`} data-role={t.role}>
             <div class="ask-who">{t.role === "user" ? W.YOU : W.REPLY}</div>
-            {t.kind === "changes" ? <ChangeCards turn={t} /> : <div class="ask-text">{t.text}</div>}
+            {t.kind === "changes" ? <ChangeCards turn={t} /> : t.kind === "offer" ? <AskOffer turn={t} /> : <div class="ask-text">{t.text}</div>}
           </div>
         ))}
         {busy ? <p class="ask-quip muted" id="ask-quip">{quip}</p> : null}

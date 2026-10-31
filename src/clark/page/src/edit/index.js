@@ -17,6 +17,7 @@ import { RichField } from "./RichField.jsx";
 import { richOn } from "./richSave.js";
 import { Safety } from "./Safety.jsx";
 import { AskSettings } from "./AskSettings.jsx";
+import { AiSettings } from "./AiSettings.jsx";
 import { askOn, setAsk, loadAsk } from "./askState.js";
 import { AskPanel } from "./AskPanel.jsx";
 import { installAskKeys, openPanel, closePanel, panelOpen } from "./askPanelState.js";
@@ -24,4 +25,4 @@ import { HelpLayer } from "../help/Help.jsx";
 import { installKeys, openHelp, closeHelp, helpOpen } from "../help/helpStore.js";
 
 // Help (#82) is among them: a published file has no Help panel and no "?" key.
-export const EDIT = { glance: GLANCE, Personal, RichField, richOn, Gutter, Add, Title, Toggle, Toast, Cell, Publish, ProfileMenu, ClientFolder, Safety, AskSettings, ask: { on: () => askOn.value, set: setAsk, load: loadAsk }, MilestoneMore: Movement, Board, LayoutSwitch, HelpLayer, AskPanel, askPanel: { open: openPanel, close: closePanel, isOpen: () => panelOpen.value, installKeys: installAskKeys }, help: { open: openHelp, close: closeHelp, isOpen: () => helpOpen.value, installKeys } };
+export const EDIT = { glance: GLANCE, Personal, RichField, richOn, Gutter, Add, Title, Toggle, Toast, Cell, Publish, ProfileMenu, ClientFolder, Safety, AskSettings, AiSettings, ask: { on: () => askOn.value, set: setAsk, load: loadAsk }, MilestoneMore: Movement, Board, LayoutSwitch, HelpLayer, AskPanel, askPanel: { open: openPanel, close: closePanel, isOpen: () => panelOpen.value, installKeys: installAskKeys }, help: { open: openHelp, close: closeHelp, isOpen: () => helpOpen.value, installKeys } };

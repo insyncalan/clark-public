@@ -15,7 +15,8 @@ Both come in as arguments; this file knows no project, opens no database and wri
 What may be read: a regular file inside a saved folder, and nothing else. The path is expanded (~) and resolved first, so a
 link or `..` is judged by where it really points. It is refused (never) when:
   1. it is a place clark never reads: secrets and system folders (platform.never_read_places(), creaite's 39 read rows) and
-     clark's own data folder (the database, its journals, backups and settings), wherever the path points;
+     clark's own data folder (the database, its journals, backups and settings), wherever the path points, and clark's own
+     program folder (#54: providers.py, which knows how keys are kept, is never readable by a question);
   2. it is not inside a saved folder (a second project's folder is not this project's);
   3. a name on the way holds secrets: any SECRET_NAMES pattern at the saved folder and at ANY depth inside it, and a secret
      a folder above the saved one called `dev.env` or `Plans.key` is no secret, so a project under it is read;
@@ -78,6 +79,8 @@ TOO_DEEP = "it is in folders nested deeper than clark goes"
 TOO_MANY_ENTRIES = "there are more folders and files than clark looks through at once, so it stopped listing"
 TOO_SLOW = "looking through the folders took longer than clark allows, so it stopped listing"
 NO_DATA = "clark can't tell where its own data is kept"
+PROGRAM = "it is part of clark itself"
+PROGRAM_DIR = Path(__file__).resolve().parent      # #54: the clark package (providers.py, the key store's code) is never read
 KIND_REASON = {"secret": SECRET, "system": SYSTEM}
 
 SECRET_FOLDERS = (".git", ".ssh", ".gnupg", ".aws", ".kube", ".docker", ".azure", ".password-store", ".terraform", ".oci",
@@ -208,6 +211,8 @@ def never_reason(p, home_dir, data):
         rel = rels[base]
         if rel is not None and matches(rel, pattern):
             return reason
+    if below(p, PROGRAM_DIR) is not None:
+        return PROGRAM
     return None
 
 
