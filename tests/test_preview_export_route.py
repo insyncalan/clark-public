@@ -339,5 +339,50 @@ class ExportRecord(Case):
         self.assertFalse(excel_import.read_workbook(self.rig.store, mine, "PUB", state_path=state).unrecorded)
 
 
+class ExportSnapshotBound(Case):
+    """#181: an Export click no longer grows the record file without limit, and an archived project keeps no snapshot."""
+
+    def books(self):
+        state = self.rig.data_dir / excel.STATE_FILE
+        return json.loads(state.read_text(encoding="utf-8"))["workbooks"] if state.exists() else {}
+
+    def hashed(self):
+        return [k for k in self.books() if k.startswith("sha256:")]
+
+    def change(self, n):
+        with self.rig.store.step("dashboard", base.USER) as st:
+            st.create("actions", {"project": "PUB", "description": f"Change {n}", "raised": "2026-10-28", "source": "test"})
+
+    def test_fifty_clicks_leave_one_record_and_the_record_file_is_not_written_again(self):
+        get(self.rig, "/api/export?project=PUB")
+        state = self.rig.data_dir / excel.STATE_FILE
+        first = state.read_bytes()
+        with mock.patch.object(platform, "write_file", wraps=platform.write_file) as write:
+            for _ in range(49):
+                get(self.rig, "/api/export?project=PUB")
+            wrote = [c.args[0] for c in write.call_args_list if Path(c.args[0]) == state]
+        self.assertEqual(len(self.hashed()), 1)
+        self.assertEqual(state.read_bytes(), first)
+        self.assertEqual(wrote, [], "the same record is never written to the record file again")
+
+    def test_exports_that_change_keep_only_the_newest_ten_for_the_project(self):
+        raws = []
+        for n in range(excel.KEEP_NEWEST + 3):
+            self.change(n)
+            raws.append(get(self.rig, "/api/export?project=PUB")[2])
+        self.assertEqual(len(self.hashed()), excel.KEEP_NEWEST)
+        state = self.rig.data_dir / excel.STATE_FILE
+        for i, raw in enumerate(raws):
+            f = Path(self.rig.root) / f"e{i}.xlsx"
+            f.write_bytes(raw)
+            self.assertEqual(bool(excel.load_state(state, f)), i >= len(raws) - excel.KEEP_NEWEST, i)
+
+    def test_an_archived_project_keeps_no_snapshot_at_all(self):
+        with self.rig.store.step("dashboard", base.USER) as st:
+            st.archive("projects", "PUB")
+        get(self.rig, "/api/export?project=PUB")
+        self.assertEqual(self.hashed(), [])
+
+
 if __name__ == "__main__":
     unittest.main()
