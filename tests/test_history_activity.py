@@ -3,6 +3,7 @@ history rows do not already pin: the published page never says who last changed 
 import re
 import time
 import unittest
+from unittest import mock
 from pathlib import Path
 
 from _demo import USER, DemoStore
@@ -84,9 +85,18 @@ class WordDiffBounds(unittest.TestCase):
         a = " ".join("w%d" % i for i in range(150))
         b = " ".join("x%d" % i for i in range(150))             # about 300 tokens a side: compared alone
         budget = [history.DIFF_BUDGET]
-        t = time.monotonic()
-        rows = [history._with_diff({"kind": "Changed", "from": a, "to": b}, budget) for _ in range(200)]
-        self.assertLess(time.monotonic() - t, 5)
+        spent = []                                              # the budget is words, not seconds: count the words compared
+        real = history.difflib.SequenceMatcher
+
+        def counting(isjunk, x, y, autojunk=True):
+            spent.append(max(len(x), len(y)))
+            return real(isjunk, x, y, autojunk=autojunk)
+
+        with mock.patch.object(history.difflib, "SequenceMatcher", counting):
+            rows = [history._with_diff({"kind": "Changed", "from": a, "to": b}, budget) for _ in range(200)]
+        self.assertLessEqual(sum(spent), history.DIFF_BUDGET)   # the request never compared more than its budget
+        self.assertGreater(sum(spent), history.DIFF_BUDGET - max(spent))   # and used it up before it stopped comparing
+        self.assertLess(len(spent), 200)
         compared = [r for r in rows if "diff_note" not in r]
         self.assertTrue(0 < len(compared) < 200)
         self.assertTrue(all(r["diff_note"] == history.NOT_COMPARED for r in rows if "diff_note" in r))

@@ -612,9 +612,22 @@ class HostileXml(Refused):
         self.assertEqual(blocks(P("a" * 1_000_000, hidden=True) + P("seen")), [{"kind": "paragraph", "text": "seen"}])
 
     def test_a_giant_paragraph_is_refused_before_it_is_built(self):
-        started = time.time()
-        self.refused(docx(P("".join(random.Random(7).choices(string.ascii_letters, k=5_000_000)))), "200,000")
-        self.assertLess(time.time() - started, 5)
+        # Counted, not timed: the work done is the characters the reader accepted into a paragraph and the ones offered to it.
+        size = 5_000_000
+        seen = {"offered": 0, "built": 0}
+        real_add = docx_read._Body.add
+
+        def counting_add(body, s):
+            seen["offered"] += len(s)
+            real_add(body, s)                          # raises once the paragraph is over the limit
+            if body.para is not None:
+                seen["built"] = max(seen["built"], body.para["len"])
+
+        data = docx(P("".join(random.Random(7).choices(string.ascii_letters, k=size))))
+        with mock.patch.object(docx_read._Body, "add", counting_add):
+            self.refused(data, "200,000")
+        self.assertLessEqual(seen["built"], docx_read.MAX_PARAGRAPH)       # nothing was built past the limit
+        self.assertLess(seen["offered"], size)                              # and the rest of the text was never even read
 
 
 class NothingOutsideIsTouched(Refused):
