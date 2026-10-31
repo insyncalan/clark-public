@@ -1,11 +1,13 @@
 // #80: what the Work items table's four cells may change, as plain functions with no DOM and no clock (the caller hands in
 // today). Each cell (owner, due, priority, status) has its own picker in ./cells/, and the peek (#42) can use the same pickers
 // later. A change is sent through api.js as kind actions, raid or decisions, op update (clark/changes.py, #68): only
-// the fields it accepts are named here. A RAID item's priority comes from its impact and likelihood and a decision has none, so
-// their Priority cell is not a picker.
+// the fields it accepts are named here. A RAID item's priority comes from its impact and likelihood, so a risk's or an issue's
+// Priority cell changes those two (#210); an assumption's or a dependency's is not a picker, and a decision has no priority.
 import { dueField, showDate, dayNumber } from "../workItems.js";
 
 export const PRIORITIES = ["Urgent", "High", "Medium", "Low"];
+export const LEVELS = ["High", "Medium", "Low"];                       // a risk's or an issue's impact and likelihood
+export const RAID_LEVELS = [["impact", "Impact"], ["likelihood", "Likelihood"]];
 const STATUSES = {
   action: ["Open", "Delayed", "Closed", "Cancelled"],
   raid: ["Open", "Closed", "Cancelled"],
@@ -25,13 +27,24 @@ export function tableOf(row) {
 
 /** Whether a cell of this row opens a picker. */
 export function canPick(row, field) {
-  if (field === "priority") return row.kind === "action";
+  if (field === "priority") return row.kind === "action" || raidLevels(row);
   return FIELDS.includes(field);
 }
 
-/** Why a cell that is not a picker can't be changed here, for its tooltip: a RAID item's priority comes from its impact and likelihood. */
+/** Whether the row's Priority cell changes its impact and likelihood (#210): a risk or an issue. */
+export function raidLevels(row) { return row.kind === "risk" || row.kind === "issue"; }
+
+/** A risk's or an issue's priority from its impact and likelihood, as clark works it out (store.priority); null if either is unset. */
+export function priorityFrom(impact, likelihood) {
+  if (!impact || !likelihood) return null;
+  if (impact === "High" && likelihood === "High") return "Urgent";
+  if (impact === "High" || likelihood === "High") return "High";
+  return impact === "Low" && likelihood === "Low" ? "Low" : "Medium";
+}
+
+/** Why a cell that is not a picker can't be changed here, for its tooltip: an assumption's or a dependency's priority comes from its impact and likelihood. */
 export function whyFixed(row, field) {
-  return field === "priority" && tableOf(row) === "raid" ? "Set from impact and likelihood" : "";
+  return field === "priority" && tableOf(row) === "raid" && !raidLevels(row) ? "Set from impact and likelihood" : "";
 }
 
 /** The statuses a row may be given. A made decision can't go back to Pending, so Pending is not offered then. */
@@ -104,6 +117,16 @@ export function changeFor(row, field, value, today) {
     if (iso === was) return null;
     const back = was ? `${name} of ${row.id} is back to ${showDate(was)}.` : `${name} of ${row.id} is blank again.`;
     return { changes: { [dueColumn(row)]: iso }, words: iso ? `${name} of ${row.id} changed to ${showDate(iso)}.` : `${name} of ${row.id} cleared.`, back };
+  }
+  if (field === "priority" && raidLevels(row)) {                   // #210: the value is "impact:High" or "likelihood:Low"
+    const [col, level] = String(value == null ? "" : value).split(":");
+    const pair = RAID_LEVELS.find(([c]) => c === col);
+    if (!pair || !LEVELS.includes(level)) return { error: "That level can't be used, so nothing was changed. Pick High, Medium or Low." };
+    if (level === row[col]) return null;
+    const now = { impact: row.impact, likelihood: row.likelihood, [col]: level };
+    const after = priorityFrom(now.impact, now.likelihood);
+    const back = row[col] ? `${pair[1]} of ${row.id} is back to ${row[col]}.` : `${pair[1]} of ${row.id} is blank again.`;
+    return { changes: { [col]: level }, words: `${pair[1]} of ${row.id} changed to ${level}.${after ? ` Priority is now ${after}.` : ""}`, back };
   }
   if (field === "priority") {
     if (tableOf(row) === "raid") return { error: "A risk's or issue's priority is set from its impact and likelihood, so nothing was changed." };

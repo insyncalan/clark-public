@@ -367,6 +367,9 @@ table.items tbody tr:focus-visible { outline: 2px solid var(--brand-blue); outli
 .cpop [role="menuitemradio"] { display: flex; align-items: center; }
 .cpop [role="menuitemradio"] { flex-wrap: wrap; }
 .cpop .mi-note { flex-basis: 100%; order: 2; font-size: var(--size-small); color: var(--text-muted); }
+.cpop .mi-group { display: flex; flex-direction: column; }
+.cpop .mi-group + .mi-group { margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--border); }
+.cpop .mi-h { padding: 4px 12px 2px; font-size: var(--size-small); font-weight: 600; color: var(--text-muted); }
 .cpop [role="menuitemradio"][aria-checked="true"]::after { content: "✓"; margin-left: auto; padding-left: 14px; color: var(--status-blue-text); }
 .cpop .menu-item:focus-visible, .cpop button:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: -2px; }
 .cowner { width: 260px; padding: 6px; }

@@ -64,7 +64,8 @@ class Rules(unittest.TestCase):
         return self.js(f"E.changeFor({json.dumps(row)}, {json.dumps(field)}, {json.dumps(value)}, {json.dumps(TODAY)})")
 
     ACTION = {"id": "ABC-A-001", "kind": "action", "owner": "Ada Quillfeather", "priority": "High", "status": "Open", "due_date": "2026-11-02"}
-    RISK = {"id": "ABC-007", "kind": "risk", "owner": "TBC", "priority": "High", "status": "Open", "due_date": None}
+    RISK = {"id": "ABC-007", "kind": "risk", "owner": "TBC", "priority": "High", "impact": "High", "likelihood": "Medium", "status": "Open", "due_date": None}
+    ASSUMPTION = {**RISK, "id": "ABC-009", "kind": "assumption"}
     PENDING = {"id": "ABC-D-001", "kind": "decision", "owner": None, "priority": None, "status": "Pending", "needed_by": "2026-11-27", "date": None}
     MADE = {"id": "ABC-D-002", "kind": "decision", "owner": "Cressida Pennywhistle", "priority": None, "status": "Made", "needed_by": None, "date": "2026-10-20"}
 
@@ -105,7 +106,11 @@ class Rules(unittest.TestCase):
         self.assertEqual(self.change(self.MADE, "due", ""), {"error": "A made decision keeps the date it was made. Pick another date instead."})
         # each says why, that nothing was changed, and what to do next
         self.assertEqual(self.change(self.ACTION, "due", "2026-02-30"), {"error": "That date isn't a real day, so nothing was changed. Pick another date."})
-        self.assertEqual(self.change(self.RISK, "priority", "Low"), {"error": "A risk's or issue's priority is set from its impact and likelihood, so nothing was changed."})
+        self.assertEqual(self.change(self.ASSUMPTION, "priority", "Low"), {"error": "A risk's or issue's priority is set from its impact and likelihood, so nothing was changed."})
+        level = {"error": "That level can't be used, so nothing was changed. Pick High, Medium or Low."}
+        for bad in ("Low", "impact:Urgent", "priority:Low", "impact:low", "", None):
+            with self.subTest(bad=bad):
+                self.assertEqual(self.change(self.RISK, "priority", bad), level)
         self.assertEqual(self.change(self.PENDING, "priority", "Low"), {"error": "A decision has no priority, so nothing was changed."})
         self.assertEqual(self.change(self.ACTION, "priority", "Critical"), {"error": "That priority can't be used, so nothing was changed. Pick Urgent, High, Medium or Low."})
         status = {"error": "That status isn't one this item can have, so nothing was changed. Pick one from the list."}
@@ -147,8 +152,10 @@ class Rules(unittest.TestCase):
                                {"text": "Pending", "class": "b"}, {"text": "Made", "class": "g"}, {"text": "Withdrawn", "class": "n"}, {"text": "Closed", "class": "n"}])
 
     def test_a_raid_items_priority_says_why_it_is_not_a_picker(self):
-        got = self.js(f"[{json.dumps(self.RISK)}, {json.dumps({**self.RISK, 'kind': 'issue'})}, {json.dumps(self.ACTION)}, {json.dumps(self.PENDING)}].map(r => E.whyFixed(r, 'priority'))")
-        self.assertEqual(got, ["Set from impact and likelihood", "Set from impact and likelihood", "", ""])
+        # #210: a risk's and an issue's are pickers (impact and likelihood); an assumption's and a dependency's still say why not
+        got = self.js(f"[{json.dumps(self.RISK)}, {json.dumps({**self.RISK, 'kind': 'issue'})}, {json.dumps(self.ASSUMPTION)}, {json.dumps({**self.RISK, 'kind': 'dependency'})}, "
+                      f"{json.dumps(self.ACTION)}, {json.dumps(self.PENDING)}].map(r => E.whyFixed(r, 'priority'))")
+        self.assertEqual(got, ["", "", "Set from impact and likelihood", "Set from impact and likelihood", "", ""])
         self.assertEqual(self.js(f"E.whyFixed({json.dumps(self.RISK)}, 'status')"), "")
 
     def test_the_choices_and_which_cells_are_pickers(self):
@@ -157,11 +164,31 @@ class Rules(unittest.TestCase):
         self.assertEqual(self.js(f"E.statusChoices({json.dumps(self.PENDING)})"), ["Pending", "Made", "Withdrawn"])
         self.assertEqual(self.js(f"E.statusChoices({json.dumps(self.MADE)})"), ["Made", "Withdrawn"])
         self.assertEqual(self.js("E.PRIORITIES"), ["Urgent", "High", "Medium", "Low"])
-        got = self.js(f"[{json.dumps(self.ACTION)}, {json.dumps(self.RISK)}, {json.dumps(self.PENDING)}].map(r => E.FIELDS.map(f => E.canPick(r, f)))")
-        self.assertEqual(got, [[True] * 4, [True, True, False, True], [True, True, False, True]])
+        got = self.js(f"[{json.dumps(self.ACTION)}, {json.dumps(self.RISK)}, {json.dumps({**self.RISK, 'kind': 'issue'})}, {json.dumps(self.ASSUMPTION)}, {json.dumps(self.PENDING)}].map(r => E.FIELDS.map(f => E.canPick(r, f)))")
+        self.assertEqual(got, [[True] * 4, [True] * 4, [True] * 4, [True, True, False, True], [True, True, False, True]])
         self.assertEqual(self.js(f"[E.canClearDue({json.dumps(self.MADE)}), E.canClearDue({json.dumps(self.PENDING)})]"), [False, True])
         self.assertEqual(self.js(f"[E.fieldName({json.dumps(self.PENDING)}, 'due'), E.fieldName({json.dumps(self.MADE)}, 'due'), E.fieldName({json.dumps(self.MADE)}, 'owner')]"),
                          ["Needed-by date", "Decision date", "Decider"])
+
+    def test_a_risks_priority_pick_changes_its_impact_or_likelihood_and_says_the_new_priority(self):
+        """#210: one field per pick; the toast says the priority it now works out to, and Undo the value it goes back to."""
+        self.assertEqual(self.change(self.RISK, "priority", "impact:Low"),
+                         {"changes": {"impact": "Low"}, "words": "Impact of ABC-007 changed to Low. Priority is now Medium.",
+                          "back": "Impact of ABC-007 is back to High."})
+        self.assertEqual(self.change(self.RISK, "priority", "likelihood:High"),
+                         {"changes": {"likelihood": "High"}, "words": "Likelihood of ABC-007 changed to High. Priority is now Urgent.",
+                          "back": "Likelihood of ABC-007 is back to Medium."})
+        issue = {**self.RISK, "kind": "issue", "id": "ABC-010", "impact": "Low", "likelihood": "Low", "priority": "Low"}
+        self.assertEqual(self.change(issue, "priority", "impact:Medium")["changes"], {"impact": "Medium"})
+        self.assertIsNone(self.change(self.RISK, "priority", "impact:High"), "the value it has: nothing is sent")
+        self.assertIsNone(self.change(self.RISK, "priority", "likelihood:Medium"))
+        # the page works the priority out as clark does (store.priority), for every pair
+        from clark import store
+        levels = ["High", "Medium", "Low", None]
+        got = self.js(f"{json.dumps(levels)}.flatMap(i => {json.dumps(levels)}.map(l => E.priorityFrom(i, l)))")
+        self.assertEqual(got, [store.priority(i, l) for i in levels for l in levels])
+        self.assertEqual(self.js("E.LEVELS"), list(store.ALLOWED[("raid", "impact")]))
+        self.assertEqual(self.js("E.LEVELS"), list(store.ALLOWED[("raid", "likelihood")]))
 
     def test_people_and_matching(self):
         d = {"actions": [{"owner": "Ada Quillfeather"}, {"owner": "TBC"}], "raid": [{"owner": " Edna Marblethorpe "}],
@@ -410,11 +437,84 @@ class Live(unittest.TestCase):
                 click(cdp, sid, "h1")
                 self.until(cdp, sid, "document.querySelectorAll('[data-pop]').length === 0", "a click away closes it")
                 self.assertEqual(len(self.sent), n)
-                # a RAID item's priority and a decision's are not pickers
-                self.assertEqual(cdp.js("[!!document.querySelector(\"[data-cell='TUL-007:priority']\"), !!document.querySelector(\"[data-cell='TUL-D-016:priority']\")]", sid), [False, False])
-                self.assertEqual(cdp.js("document.querySelector(\"[data-fixed='TUL-007:priority']\").title", sid), "Set from impact and likelihood", "a risk's priority says why it can't be picked")
+                # an assumption's priority and a decision's are not pickers (#210: a risk's and an issue's are, below)
+                self.assertEqual(cdp.js("[!!document.querySelector(\"[data-cell='TUL-009:priority']\"), !!document.querySelector(\"[data-cell='TUL-D-016:priority']\")]", sid), [False, False])
+                self.assertEqual(cdp.js("document.querySelector(\"[data-fixed='TUL-009:priority']\").title", sid), "Set from impact and likelihood", "an assumption's priority says why it can't be picked")
                 self.assertEqual(cdp.js("[!!document.querySelector(\"[data-fixed='TUL-D-016:priority']\"), document.querySelector(\"tr[data-id='TUL-D-016'] .c-prio\").textContent]", sid), [False, "—"], "a decision's shows a dash")
                 self.assertEqual(cdp.js("document.documentElement.scrollWidth <= window.innerWidth", sid), True, "no sideways scroll")
+
+    def test_a_risks_priority_opens_impact_and_likelihood_one_step_with_undo_in_both_colours(self):
+        """#210: the Priority cell of a risk and of an issue opens a picker for the two its priority is worked out from."""
+        contrast = """(function(sel){
+            function rgb(c){ return c.match(/[\\d.]+/g).map(Number).slice(0, 3); }
+            function lum(c){ var v = rgb(c).map(function(x){ x /= 255; return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); }); return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2]; }
+            var a = lum(getComputedStyle(document.querySelector(sel)).color), b = lum(getComputedStyle(document.querySelector('[data-pop]')).backgroundColor);
+            return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+        })"""
+        for width in (1400, 900):
+            for scheme in ("light", "dark"):
+                with self.subTest(width=width, scheme=scheme), chrome() as cdp:
+                    sid = self.open_page(cdp, width)
+                    cdp.js(f"document.documentElement.dataset.theme = '{scheme}'", sid)
+                    cell = "[data-cell='TUL-007:priority']"
+                    self.assertEqual(self.cell_text(cdp, sid, "TUL-007", "priority"), "High")
+                    self.assertTrue(cdp.js("!!document.querySelector(\"[data-cell='TUL-010:priority']\")", sid), "an issue's too")
+                    self.assertEqual(cdp.js(f"document.querySelector(\"{cell}\").tabIndex", sid), -1, "the table stays one tab stop")
+                    # by click: two headed groups, each with its value now ticked; focus starts on the impact
+                    before = self.steps()
+                    click(cdp, sid, cell)
+                    self.until(cdp, sid, "!!document.querySelector('[data-pop][role=menu]')", "the picker opened")
+                    self.assertEqual(cdp.js("[...document.querySelectorAll('[data-pop] [role=group]')].map(g => [g.getAttribute('aria-label'), [...g.querySelectorAll('[role=menuitemradio]')].map(b => b.textContent)])", sid),
+                                     [["Impact", ["High", "Medium", "Low"]], ["Likelihood", ["High", "Medium", "Low"]]])
+                    self.assertEqual(cdp.js("[...document.querySelectorAll('[data-pop] [aria-checked=true]')].map(b => b.dataset.value)", sid), ["impact:High", "likelihood:Medium"])
+                    self.assertEqual(self.focused(cdp, sid), "impact:High", "focus starts on the value it has")
+                    self.assertGreaterEqual(cdp.js(contrast + "('[data-pop] .mi-h')", sid), 3.0, "the headings can be read")
+                    self.assertGreaterEqual(cdp.js(contrast + "('[data-pop] [role=menuitemradio]')", sid), 4.5, "the choices can be read")
+                    box = cdp.js("(() => { const r = document.querySelector('[data-pop]').getBoundingClientRect(); return [r.left >= 0, r.right <= innerWidth, r.top >= 0, r.bottom <= innerHeight]; })()", sid)
+                    self.assertEqual(box, [True] * 4, "the picker is whole on screen")
+                    click(cdp, sid, "[data-pop] [data-value='likelihood:High']")
+                    self.until(cdp, sid, "!!document.querySelector('[data-undo]')", "the toast offers Undo")
+                    r = self.row("raid", "TUL-007")
+                    self.assertEqual((r["impact"], r["likelihood"], r["priority"]), ("High", "High", "Urgent"))
+                    self.until(cdp, sid, f"document.querySelector(\"{cell}\").textContent === 'Urgent'", "the cell shows the worked-out priority")
+                    self.changed_once(before, "likelihood")
+                    self.assertEqual(self.toast(cdp, sid), "Likelihood of TUL-007 changed to High. Priority is now Urgent.")
+                    self.plain_words(cdp, sid)
+                    self.assertNotIn("item=", cdp.js("location.hash", sid), "a cell click never opens the peek")
+                    self.assertEqual(self.sent[-1][1], {"project": "TUL", "kind": "raid", "op": changes.UPDATE, "id": "TUL-007", "changes": {"likelihood": "High"}, "place": "cell"})
+                    self.undo(cdp, sid, "likelihood", "Likelihood of TUL-007 is back to Medium.")
+                    r = self.row("raid", "TUL-007")
+                    self.assertEqual((r["impact"], r["likelihood"], r["priority"]), ("High", "Medium", "High"), "Undo puts back the field and its priority")
+                    self.until(cdp, sid, f"document.querySelector(\"{cell}\").textContent === 'High'", "Undo draws the row as it was")
+                    if (width, scheme) != (1400, "light"):
+                        continue
+                    # by keyboard: Enter opens, Down moves, Enter picks; focus is back on the cell
+                    cdp.js(f"document.querySelector(\"{cell}\").focus()", sid)
+                    key(cdp, sid, "Enter")
+                    self.until(cdp, sid, "!!document.querySelector('[data-pop][role=menu]')", "Enter opens the picker")
+                    key(cdp, sid, "ArrowDown")
+                    key(cdp, sid, "ArrowDown")
+                    self.assertEqual(self.focused(cdp, sid), "impact:Low")
+                    key(cdp, sid, "Enter")
+                    self.until(cdp, sid, f"!!document.querySelector('[data-undo]') && document.querySelector(\"{cell}\").textContent === 'Medium'", "the keyboard pick saved")
+                    r = self.row("raid", "TUL-007")
+                    self.assertEqual((r["impact"], r["likelihood"], r["priority"]), ("Low", "Medium", "Medium"))
+                    self.until(cdp, sid, f"document.activeElement === document.querySelector(\"{cell}\")", "focus is back on the cell")
+                    self.undo(cdp, sid, "impact by keyboard", "Impact of TUL-007 is back to High.")
+                    # Esc leaves it as it was; the row click elsewhere still opens the peek
+                    n, before = len(self.sent), self.steps()
+                    cdp.js(f"document.querySelector(\"{cell}\").focus()", sid)
+                    key(cdp, sid, "ArrowDown", alt=True)
+                    self.until(cdp, sid, "!!document.querySelector('[data-pop][role=menu]')", "Alt+Down opens it too")
+                    key(cdp, sid, "ArrowDown")
+                    key(cdp, sid, "Escape")
+                    self.until(cdp, sid, "document.querySelectorAll('[data-pop]').length === 0", "one Esc closes it")
+                    self.assertEqual((len(self.sent), self.steps(), self.row("raid", "TUL-007")["priority"]), (n, before, "High"))
+                    click(cdp, sid, "tr[data-id='TUL-007'] .t")
+                    self.until(cdp, sid, "location.hash.includes('item=TUL-007')", "the row click still opens the peek")
+                    # a decision's priority is as it was: a dash, no picker
+                    self.assertEqual(cdp.js("[!!document.querySelector(\"[data-cell='TUL-D-016:priority']\"), !!document.querySelector(\"[data-fixed='TUL-D-016:priority']\"), document.querySelector(\"tr[data-id='TUL-D-016'] .c-prio\").textContent]", sid),
+                                     [False, False, "—"])
 
     def test_status_by_click_and_keyboard(self):
         for width in (1400, 900):

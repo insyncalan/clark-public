@@ -43,10 +43,10 @@ CHANGE_KINDS = {
     "report_sections": {NEW: ("type", "title"), UPDATE: ("title", "hidden", "beside"), MOVE: ("beside",), DELETE: ()},
     # #68: the work items board changes an item's fields, and nothing else. Only `update`: no new, move or delete for these kinds
     # (an item is closed or cancelled by its status, and archived only by archiving). priority is not in raid's list because the
-    # store works it out from impact and likelihood; `archived` is in no list.
+    # store works it out from impact and likelihood (#210: those two are, so its Priority cell changes them); `archived` is in no list.
     # #67: a work item's title is the column the page shows as its title: an action's and a RAID item's `description`, a decision's `decision`.
     "actions": {UPDATE: ("status", "workstream", "owner", "priority", "due_date", "milestone", "use_case", "description")},
-    "raid": {UPDATE: ("status", "workstream", "owner", "due_date", "milestone", "use_case", "description")},
+    "raid": {UPDATE: ("status", "workstream", "owner", "due_date", "milestone", "use_case", "description", "impact", "likelihood")},
     "decisions": {UPDATE: ("status", "made_by", "needed_by", "date", "use_case", "decision")},   # #45: use_case links an existing use case of this project, or clears the link
     # #45: the At a glance tiles and the project's health. A tile is hidden, given an outline colour or moved (its place is worked
     # out here, never sent); the project's change takes no `id` (it is the request's project) and only its health and the reason.
@@ -94,11 +94,11 @@ ITEM_KINDS = ("actions", "raid", "decisions")        # the work items; every oth
 UC_FIELDS = CHANGE_KINDS["use_cases"][UPDATE]        # #164: what a request may change on a use case
 UC_NAME_LIMIT = 120                                  # a use case's name, in characters
 UC_HEADLINE_LIMIT = 300                              # its one-line headline
-ITEM_NOT_NULL = ("status", "owner", "priority", "description", "decision")
+ITEM_NOT_NULL = ("status", "owner", "priority", "description", "decision", "impact", "likelihood")
 CLEARED_BY_NEW = ("owner", "priority", "status", "description", "decision", "type", "name", "impact", "likelihood")   # sent as null on a new row: refused      # a work item field that has to have a value (the others may be cleared)
 TITLE_FIELDS = ("description", "decision")           # #67: a work item's title; never said back in a reply (the page keeps what it sent); a new milestone's name is held to the same
 ITEM_SHOWN = {k: ("id",) + tuple(f for f in CHANGE_KINDS[k][UPDATE] if f not in TITLE_FIELDS) + (("closed",) if k != "decisions" else ())
-              for k in ITEM_KINDS}                   # what a reply says of a changed item
+              + (("priority",) if k == "raid" else ()) for k in ITEM_KINDS}   # what a reply says of a changed item (#210: a risk's worked-out priority too)
 FLAG_FIELDS = ("hidden", "beside")        # 0 or 1 only: a bool, a float, a string or any other number is refused
 BASE_KEYS = ("project", "kind", "op", "place")
 OP_KEYS = {NEW: ("values", "after"), UPDATE: ("id", "changes"), MOVE: ("id", "before", "flags"), DELETE: ("id",),
@@ -574,6 +574,8 @@ def _do_item_change(store, by_user, req, project, table, columns, place):
     changes = _checked_item_changes(_fields(req.get("changes"), table, UPDATE, columns, "the changes"))
     if not changes:
         raise Refused("Say what to change.")
+    if any(k in ("impact", "likelihood") and v not in clark_store.ALLOWED[(table, k)] for k, v in changes.items()):
+        raise Refused(NOT_A_CHOICE)                                  # #210: High, Medium or Low, as a new row's
     with store.step(VIA, by_user, place=place) as st:               # BEGIN IMMEDIATE: what is read next is what is changed
         row = store.read(table, ref=ref) if isinstance(ref, str) else None
         if row is None or row["project"] != project or row["archived"]:
@@ -1116,6 +1118,7 @@ def _eligible(rows, project):
 
 UC_FIELD_NAMES = {"title": "name", "headline": "headline", "standing": "standing text"}
 ITEM_FIELD_NAMES = {"description": "title", "decision": "title", "status": "status", "workstream": "workstream", "owner": "owner", "priority": "priority",
+                    "impact": "impact", "likelihood": "likelihood",
                     "due_date": "due date", "milestone": "milestone", "made_by": "decider", "needed_by": "needed-by date",
                     "date": "decision date", "closed": "closing date", "use_case": "use case"}
 UC_REF = re.compile(r"[A-Z][A-Z0-9]{2,6}-U-\d{3}")                  # #164: a use case's id; the words call it by its name
