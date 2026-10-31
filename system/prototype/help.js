@@ -204,7 +204,7 @@
     { id: 'add-a-section-from-a-template', g: 'The report', t: 'Add a section from a template', w: 'Dashboard › Edit › the + under a section’s grip', go: 'dashboard+edit', s: [
       'On the **Dashboard**, press **Edit**. Press the **+** under the grip of the section you want the new one to follow, or open its menu and choose **Add a template below…**.',
       'The **Add a section** box opens. Choose a kind on the left (on a phone the kinds are a row of chips along the top), or type in **Search templates**. [[Left]], [[Right]], [[Up]] and [[Down]] move through the templates; the preview on the right shows what the chosen one holds.',
-      'Under **Place it**, choose **On its own row** or, when the next section is on a row of its own and the template can be half width, **Beside** that section.',
+      'Under **Where it goes**, choose **On its own row** or, when the next section is on a row of its own and the template can be half width, **Beside** that section.',
       'Press **Add section** (or [[Enter]]). The new section appears with its heading ready to rename; [[Esc]] closes the box without adding anything.',
       'Every template other than **Text** and **Needs from you** is empty when you add it, with each of its parts labelled. Filling the parts in comes in a later release; until then an empty template is left out of the published page. **Needs from you** works at once, from live data and the lines you add, and is published.',
       'One **Undo** takes the new section away again. See [Section templates](#ref-section-templates) for what each one is for.' ] },

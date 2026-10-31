@@ -4,6 +4,7 @@ import { data } from "../stores/report.js";
 import { change } from "../stores/changes.js";
 import { keep } from "./focus.js";
 import { note } from "./notes.js";
+import { plan as planTemplate } from "../logic/templates.js";
 import { place, step, beside as besideOf, fullWidth as fullOf, rows } from "../logic/placement.js";
 
 export const TITLE_MAX = 120;
@@ -61,4 +62,20 @@ export function remove(id, place) {
   const next = all[i + 1] || all[i - 1];
   const done = change({ op: "delete", id, place }, "Section deleted.");
   return next ? keep(done, next.id, "handle") : done;
+}
+
+// Add template `id` below section `after` (null: at the end), alone or beside the next section (logic/templates.js plan). The
+// requests go one after another; a request whose id is "$new" means the section the first one made. Resolves to the first
+// reply, or to null when nothing was added (a refusal in a note, or clark said no in the toast). The new section's title takes focus.
+export async function addFromTemplate(id, after, beside) {
+  const p = planTemplate(list(), id, after, beside);
+  if (!p.ok) { note(p.message); return null; }
+  let first = null;
+  for (const req of p.requests) {
+    const r = await change(req.id === "$new" ? { ...req, id: first.ref } : req, p.words);
+    if (!r) return first;                                   // the toast says why; what was made stays made, with its own Undo
+    if (!first) first = r;
+  }
+  keep(Promise.resolve(first), "new", "title");
+  return first;
 }

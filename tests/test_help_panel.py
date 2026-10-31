@@ -60,15 +60,15 @@ class Panel(Base):
             self.assertEqual(p.js("document.querySelectorAll('.hp-job, .hp-steps li, .hp-first li').length"), 0, "no held entry on Start here")
             self.assertTrue(p.js("!!document.querySelector('#hp-later')"))
             p.js("document.querySelector('#hpTab-howto').click()")
-            p.until("document.querySelectorAll('.hp-task').length > 0", "How do I… has the one task the page can do")
-            self.assertEqual(p.js("document.querySelectorAll('.hp-task').length"), 1)
+            p.until("document.querySelectorAll('.hp-task').length > 0", "How do I… has the two tasks the page can do")
+            self.assertEqual(p.js("document.querySelectorAll('.hp-task').length"), 2)
             self.assertEqual(p.js("!!document.querySelector('#hp-later')"), False)
             p.js("document.querySelector('#hpTab-reference').click()")
             p.until("document.querySelectorAll('.hp-ref').length > 0", "Reference drew")
             self.assertEqual(p.js("document.querySelectorAll('.hp-ref').length"), len(shown_content()["reference"]["sections"]))
             self.assertEqual(p.js("document.querySelector('#hp-ref-keys .hp-keys tbody').children.length"), len(shown_content()["reference"]["keys"]))
             self.assertEqual(p.js("document.querySelector('#hp-ref-keys .hp-keys').textContent.indexOf('Sneak peek')"), -1)
-            self.assertEqual(p.js("document.querySelector('.hp-idx') && document.querySelectorAll('.hp-idx a').length"), 1)
+            self.assertEqual(p.js("document.querySelector('.hp-idx') && document.querySelectorAll('.hp-idx a').length"), 2)
 
     def test_search_finds_what_is_shown_and_opens_in_place_and_not_what_is_held(self):
         from test_server import chrome

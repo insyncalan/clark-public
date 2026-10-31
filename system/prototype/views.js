@@ -666,7 +666,7 @@
         if (lastSel !== sel && !C.reduce) { P2.classList.remove('swap'); void P2.offsetWidth; P2.classList.add('swap'); } lastSel = sel;   /* the preview cross-fades when the selection moves (idea 10) */
         P2.innerHTML = `<h3>${esc(T.name)}</h3>${skHtml(T, true)}<p>${esc(T.d)}</p>
           <div><span class="atd-lab">Holds</span><div class="atd-els">${T.els.map(e => `<span>${esc(e)}</span>`).join('')}</div></div>
-          <fieldset class="atd-place"><legend class="atd-lab">Place it</legend><label><input type="radio" name="atdPlace" value="row" ${place === 'row' ? 'checked' : ''}> On its own row</label>
+          <fieldset class="atd-place"><legend class="atd-lab">Where it goes</legend><label><input type="radio" name="atdPlace" value="row" ${place === 'row' ? 'checked' : ''}> On its own row</label>
             ${next ? `<label><input type="radio" name="atdPlace" value="beside" ${place === 'beside' ? 'checked' : ''} ${half ? '' : 'disabled'}> Beside “${esc(next.title)}” (half width)${half ? '' : ' <span class="muted">· full width only</span>'}</label>` : ''}</fieldset>
           <button type="button" class="link" data-help>${C.icon('info', 's')} See every template explained in Help</button>`;
         C.$$('[data-help]', P2).forEach(b => b.addEventListener('click', help)); C.$$('input[name=atdPlace]', P2).forEach(i => i.addEventListener('change', () => { place = i.value; }));

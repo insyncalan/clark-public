@@ -419,9 +419,9 @@
     "s": [
      "On the **Dashboard**, press **Edit**. Press the **+** under the grip of the section you want the new one to follow, or open its menu and choose **Add a template below…**.",
      "The **Add a section** box opens. Choose a kind on the left, or type in **Search templates**. [[Left]], [[Right]], [[Up]] and [[Down]] move through the templates; the preview on the right shows what the chosen one holds.",
-     "Under **Place it**, choose **On its own row** or, when the next section is on a row of its own and the template can be half width, **Beside** that section.",
+     "Under **Where it goes**, choose **On its own row** or, when the next section is on a row of its own and the template can be half width, **Beside** that section.",
      "Press **Add section** (or [[Enter]]). The new section appears with its heading ready to rename; [[Esc]] closes the box without adding anything.",
-     "Every template other than **Text** is empty when you add it, with each of its parts labelled. Filling the parts in comes in a later release; until then an empty template is left out of the published page.",
+     "Only **Text** can be added so far. The other templates are listed with “Coming with a later release.” and cannot be added yet.",
      "One **Undo** takes the new section away again. See [Section templates](#ref-section-templates) for what each one is for."
     ]
    },
@@ -754,7 +754,7 @@
      ],
      [
       "p",
-      "**Text** is the exception: it adds an ordinary text section. Each template works at the widths shown."
+      "**Text** is the only one that can be added so far; the others say “Coming with a later release.” Each template works at the widths shown."
      ],
      [
       "tbl",
@@ -775,34 +775,14 @@
         "Full or half"
        ],
        [
-        "Headline band",
-        "Open the report with a message: a milestone reached, a go-live, a change of phase.",
-        "Full"
-       ],
-       [
         "Key figures, four",
         "Three or four numbers with labels and a change since last week.",
         "Full or half"
        ],
        [
         "Key figures, three",
-        "The same, for three numbers. Each card is wider, so a short note fits under the change.",
+        "Three numbers with labels, in wider cards, so a short note fits under the change.",
         "Full or half"
-       ],
-       [
-        "Image gallery",
-        "Two to six pictures in a grid, each with a caption.",
-        "Full"
-       ],
-       [
-        "Table",
-        "Anything with rows: a budget line, a cut-over plan, a training schedule.",
-        "Full"
-       ],
-       [
-        "Link preview",
-        "A web page shown as a card: a dashboard, a news item, a recording.",
-        "Full"
        ],
        [
         "RAID cards, three",
@@ -830,33 +810,8 @@
         "Half or full"
        ],
        [
-        "Image with caption",
-        "One picture beside text.",
-        "Half or full"
-       ],
-       [
-        "Quote",
-        "A voice from the business.",
-        "Half or full"
-       ],
-       [
-        "Contacts",
-        "Who to ask.",
-        "Half or full"
-       ],
-       [
-        "Checklist",
-        "Next steps or readiness, ticked off.",
-        "Half or full"
-       ],
-       [
         "Key dates",
         "What’s coming, from the milestones.",
-        "Half or full"
-       ],
-       [
-        "One document",
-        "A single file to read.",
         "Half or full"
        ]
       ]

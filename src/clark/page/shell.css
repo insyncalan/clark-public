@@ -878,3 +878,51 @@ h1, h2, h3, .fig .v, .tile .n { font-family: var(--font-head); font-weight: 800;
 
 /* the home banner: a still picture a person's own look may set (--art-home, --art-home-height); empty and flat by default */
 .frame.empty::before { content: ""; display: block; height: var(--art-home-height); background: var(--art-home) center / contain no-repeat; }
+/* The Add a section box (#96): a modal over the page, desktop and 900 px. Tokens only; no text under 13 px. */
+.ad-scrim { position: fixed; inset: 0; z-index: 50; display: flex; align-items: flex-start; justify-content: center; padding: var(--space-6) var(--space-4); background: color-mix(in srgb, var(--black) 45%, transparent); overflow: auto; }
+.ad:focus { outline: none; }
+.ad { display: flex; flex-direction: column; width: min(900px, 100%); max-height: calc(100vh - 2 * var(--space-6)); max-height: calc(100dvh - 2 * var(--space-6)); background: var(--surface); border: 1px solid var(--grey-200); border-radius: var(--radius-lg); box-shadow: var(--shadow); font-size: var(--size-body); color: var(--text); }
+.ad-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-4); padding: var(--space-4) var(--space-5) var(--space-2); }
+.ad-head h2 { margin: 0; flex: 1 1 auto; font-size: var(--size-h2); font-weight: var(--weight-medium); color: var(--heading); }
+.ad-q { flex: 0 1 280px; min-width: 0; }
+.ad-q input { width: 100%; box-sizing: border-box; min-height: 32px; padding: 4px 10px; border: 1px solid var(--grey-300); border-radius: var(--radius); background: var(--surface); color: var(--text); font: inherit; }
+.ad-q input:focus-visible, .ad-tpl input:focus-visible, .ad-where input:focus-visible, .ad .pk-btn:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 2px; }
+.ad-main { display: grid; grid-template-columns: 170px minmax(0, 1fr) minmax(0, 280px); grid-template-rows: auto auto 1fr; grid-template-areas: "kinds list prev" "kinds list where" "kinds list ."; gap: 0 var(--space-4); padding: var(--space-2) var(--space-5) var(--space-4); min-height: 0; overflow: auto; }
+.ad-kinds { grid-area: kinds; display: flex; flex-direction: column; gap: 2px; }
+.ad-kind { all: unset; box-sizing: border-box; display: flex; justify-content: space-between; gap: var(--space-2); min-height: 32px; align-items: center; padding: 4px 10px; border-radius: var(--radius-sm); font-size: var(--size-small); color: var(--text); cursor: pointer; }
+.ad-kind:hover { background: var(--grey-100); }
+.ad-kind[aria-pressed="true"] { background: var(--grey-100); font-weight: var(--weight-medium); color: var(--heading); }
+.ad-kind:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 2px; }
+.ad-n { color: var(--text-muted); }
+.ad-list { grid-area: list; border: 0; margin: 0; padding: 0; min-width: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.ad-tpl { display: grid; grid-template-columns: auto 1fr auto; gap: 2px var(--space-2); align-items: baseline; padding: var(--space-2) var(--space-3); border: 1px solid var(--grey-200); border-radius: var(--radius); cursor: pointer; }
+.ad-tpl:has(input:checked) { border-color: var(--brand-blue); background: var(--grey-50); }
+.ad-tpl.off { color: var(--text-muted); cursor: default; }
+.ad-tpl input { margin: 0; accent-color: var(--brand-blue); }
+.ad-tn { font-weight: var(--weight-medium); color: var(--heading); }
+.ad-tpl.off .ad-tn { color: var(--text-muted); }
+.ad-fit { font-size: var(--size-small); color: var(--text-muted); }
+.ad-td { grid-column: 2 / 4; font-size: var(--size-small); color: var(--text-muted); overflow-wrap: anywhere; }
+/* A template the store cannot make yet is read and chosen like any other; only the button stays off, and the preview says why. */
+.ad-later { font-style: italic; }
+.ad-none { margin: var(--space-3) 0; }
+.ad-prev { grid-area: prev; min-width: 0; padding-left: var(--space-4); border-left: 1px solid var(--grey-200); overflow-wrap: anywhere; }
+.ad-prev h3 { margin: 0 0 var(--space-1); font-size: var(--size-h3); font-weight: var(--weight-medium); color: var(--heading); }
+.ad-prev p { margin: 0 0 var(--space-2); }
+.ad-prev ul { margin: 0 0 var(--space-2); padding-left: var(--space-5); }
+.ad-lbl { font-size: var(--size-small); letter-spacing: var(--tracking-caps); text-transform: uppercase; color: var(--text-muted); font-weight: var(--weight-medium); padding: 0; }
+.ad-where { grid-area: where; min-width: 0; border: 0; border-left: 1px solid var(--grey-200); margin: 0; padding: var(--space-3) 0 0 var(--space-4); display: flex; flex-direction: column; gap: var(--space-1); }
+.ad-where label { display: flex; align-items: center; gap: var(--space-2); min-height: 28px; cursor: pointer; }
+.ad-where label.off { color: var(--text-muted); cursor: default; }
+.ad-why { font-size: var(--size-small); min-height: 0; }
+.ad-helpbox { margin-right: auto; display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 var(--space-2); font-size: var(--size-small); }
+.ad-help { all: unset; box-sizing: border-box; color: var(--text-muted); font-size: var(--size-small); text-decoration: underline; text-underline-offset: 2px; cursor: default; }
+.ad-help:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 2px; border-radius: 3px; }
+.ad-foot { display: flex; justify-content: flex-end; gap: var(--space-2); padding: var(--space-3) var(--space-5); border-top: 1px solid var(--grey-200); }
+@media (max-width: 900px) {
+  /* One column: the kinds, then where to place it, then the list, then the preview, in that order in the page too, so the choice is never below all ten templates. */
+  .ad-main { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; grid-template-areas: "kinds" "where" "list" "prev"; gap: var(--space-4) 0; }
+  .ad-kinds { flex-direction: row; flex-wrap: wrap; }
+  .ad-prev, .ad-where { padding-left: 0; border-left: 0; }
+  .ad-where { padding-top: 0; }
+}

@@ -46,6 +46,8 @@ class Minimap(Base):
             self.assertEqual(self.listed(p), [i for i in IDS if i != "ABC-S-002"], "a hidden section is not listed, though Edit still draws it")
             self.assertTrue(p.js("!!document.querySelector('[data-id=\"ABC-S-002\"]')"))
             p.js("document.querySelector('[data-id=\"ABC-S-001\"] [data-add]').click()")
+            p.until("!!document.querySelector('button[data-place]') && !document.querySelector('button[data-place]').disabled", "the Add a section box opened with Text chosen")
+            p.js("document.querySelector('button[data-place]').click()")
             p.until("document.querySelectorAll('.secs > .sec').length === 12", "a section was added")
             listed = self.listed(p)
             self.assertEqual(len(listed), 11)
