@@ -33,7 +33,7 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from clark import ask, ask_apply, ask_data, ask_passages, platform, publish
+from clark import ask, ask_apply, ask_data, ask_passages, platform, publish, secret_screen
 from clark.store import Store, connect
 
 PROJECT_CODE = re.compile(r"[A-Z][A-Z0-9]{2,6}")
@@ -262,6 +262,8 @@ def folder_notes(found):
     out = []
     if found.safety:
         out.append(f"{found.safety} {'file was' if found.safety == 1 else 'files were'} left out for safety.")
+    for label in getattr(found, "secret_labels", ()):         # #215: the file's label only, never what matched
+        out.append(f"{label} was left out because it {secret_screen.REASON}. {secret_screen.NEXT_STEP}")
     if found.pdf:
         out.append(f"{found.pdf} PDF {'file was' if found.pdf == 1 else 'files were'} not read: PDF is not supported yet.")
     if found.other:

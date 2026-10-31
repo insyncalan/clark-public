@@ -14,7 +14,8 @@ more) are read as UTF-8. PDF is NOT supported yet: it is counted ("not supported
 
 WHAT COMES BACK. `FolderData`: the chosen passages (each labelled with a name inside its folder, never a path), `left_out` (how
 many did not fit the budget), `safety` (how many files were left out for safety, with the listing's own count), `pdf` and
-`other` (files of a type not read) and `stopped` (the listing was cut short). No path, no file text and no reason that holds a
+`other` (files of a type not read), `stopped` (the listing was cut short) and `secret_labels` (#215: files left out whole because
+the text looks like it holds a secret, screened by `secret_screen` before any of it becomes a passage; counted in `safety` too). No path, no file text and no reason that holds a
 path is returned or logged here.
 """
 import codecs
@@ -22,7 +23,7 @@ import os
 import time
 from dataclasses import dataclass
 
-from clark import ask, ask_data, docx_read, reach
+from clark import ask, ask_data, docx_read, reach, secret_screen
 
 TEXT_TYPES = (".txt", ".md", ".markdown", ".csv", ".tsv", ".rst")
 WORD_TYPES = (".docx",)
@@ -43,6 +44,7 @@ class FolderData:
     pdf: int = 0               # PDFs, not supported yet
     other: int = 0             # files of a type that is not read
     stopped: bool = False      # the listing was cut short by a cap
+    secret_labels: tuple = ()  # labels of files left out because they look like they hold a secret (already counted in `safety`)
 
 
 def _lines_of_word(data, name):
@@ -83,6 +85,7 @@ def _label(root, path):
 def folder_data(folders, data_dir, question="", budget=ask.BUDGET, home=None, max_passages=ask.MAX_PASSAGES):
     """Passages from the saved `folders` (a list of paths) for one question; `data_dir` is clark's own folder. See the module note."""
     safety = pdf = other = 0
+    secret_labels = []
     usable = []
     for f in folders or ():
         try:
@@ -134,6 +137,10 @@ def folder_data(folders, data_dir, question="", budget=ask.BUDGET, home=None, ma
         except (docx_read.WordRefused, ValueError, UnicodeError):
             safety += 1                                   # a Word file refused as unsafe or damaged, or text that isn't text
             continue
+        if secret_screen.looks_like_secret("\n".join(lines)):      # #215: the whole file, before any of it is a passage
+            safety += 1
+            secret_labels.append(label)
+            continue
         parts = ask_data._cut(label, list(_chunks(lines)))[:MAX_PARTS]
         chars += sum(len(p.text) for p in parts)
         if len(parts) > 1:
@@ -143,4 +150,4 @@ def folder_data(folders, data_dir, question="", budget=ask.BUDGET, home=None, ma
     if len(chosen) > max_passages:
         left += len(chosen) - max_passages
         chosen = chosen[:max_passages]
-    return FolderData(chosen, left, safety, pdf, other, bool(listing.stopped))
+    return FolderData(chosen, left, safety, pdf, other, bool(listing.stopped), tuple(secret_labels))
