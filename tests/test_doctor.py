@@ -188,7 +188,7 @@ class Port(DoctorCase):
         self.assertEqual(code, 1)
         self.assertEqual(asked[0][0], 8799)
         self.line(lines, "To fix: "
-                         "Nothing was started: clark is already open in another Terminal window, or another program is using the connection it needs. Close that Terminal window, then double-click clark.command again. If that does not help, restart your Mac.")
+                         "Nothing was started: clark is already open in another Terminal window, or another program is using the connection it needs. Close that Terminal window or program, then double-click clark.command again. If that does not help, restart your Mac.")
 
     def test_another_copy_with_other_data(self):
         with mock.patch.object(Path, "home", return_value=self.home):        # launch.report writes ~ for the real home

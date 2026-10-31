@@ -83,8 +83,8 @@ Double-clicking while clark is open just opens another window.
 
 If it says nothing was started because clark is already open in another
 Terminal window, or another program is using the connection it needs, close
-that Terminal window, then double-click clark.command again. If that does not
-help, restart your Mac.
+that Terminal window or program, then double-click clark.command again. If that
+does not help, restart your Mac.
 
 If double-clicking does nothing, open Terminal, type bash and a space,
 drag clark.command into the Terminal window and press Return.

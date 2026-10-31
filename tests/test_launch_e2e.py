@@ -21,7 +21,7 @@ from pathlib import Path
 import _paths  # noqa: F401  (puts src/ on the path)
 from clark import launch, platform as pl
 
-NOT_CLARK_LINE = "Nothing was started: clark is already open in another Terminal window, or another program is using the connection it needs. Close that Terminal window, then double-click clark.command again. If that does not help, restart your Mac."
+NOT_CLARK_LINE = "Nothing was started: clark is already open in another Terminal window, or another program is using the connection it needs. Close that Terminal window or program, then double-click clark.command again. If that does not help, restart your Mac."
 
 
 def free_port():

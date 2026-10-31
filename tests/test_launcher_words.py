@@ -42,7 +42,22 @@ class TheLaunchersLine(unittest.TestCase):
     def test_the_cause_and_the_one_next_step(self):
         text = self.say(lambda p: False)
         self.assertEqual(text, "Nothing was started: clark is already open in another Terminal window, or another program is using the "
-                               f"connection it needs. Close that Terminal window, then double-click {platform.launcher_name()} again. If that does not help, restart your Mac.")
+                               f"connection it needs. Close that Terminal window or program, then double-click {platform.launcher_name()} again. If that does not help, restart your Mac.")
+
+    def test_off_a_mac_the_line_still_reads_and_names_the_launcher_in_general_words(self):
+        with mock.patch.object(platform, "launcher_name", side_effect=platform.NotBuiltYet("not built")):
+            text = self.say(lambda p: False)
+        self.assertIn("then double-click the clark launcher again.", text)
+
+    def test_off_a_mac_a_free_port_nearby_and_either_kind_of_port_still_read_and_do_not_raise(self):
+        with mock.patch.object(platform, "launcher_name", side_effect=platform.NotBuiltYet("not built")):
+            for kind in (launch.NOT_CLARK, launch.OTHER_DATA):
+                text = launch.report(kind, 8800, Path("/tmp/clark-data"), free=lambda p: p == 8801)
+                self.assertTrue(text)
+                self.assertNotIn("--port", text, "no command to type off a Mac")
+
+    def test_the_step_covers_another_program_as_well_as_a_window(self):
+        self.assertIn("Close that Terminal window or program, then double-click", self.say(lambda p: False))
 
     def test_a_free_port_is_only_a_second_line_for_a_person_who_cannot_close_the_other(self):
         text = self.say(lambda p: p == 8801)
@@ -54,7 +69,7 @@ class TheLaunchersLine(unittest.TestCase):
 class StartHere(unittest.TestCase):
     def test_the_paragraph(self):
         self.assertIn("If it says nothing was started because clark is already open in another\nTerminal window, or another program is using the "
-                      "connection it needs, close\nthat Terminal window, then double-click clark.command again. If that does not\nhelp, restart your Mac.\n", package.START_HERE_MAC)
+                      "connection it needs, close\nthat Terminal window or program, then double-click clark.command again. If that\ndoes not help, restart your Mac.\n", package.START_HERE_MAC)
 
 
 class TheyAgree(unittest.TestCase):

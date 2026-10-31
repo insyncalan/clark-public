@@ -208,14 +208,14 @@ class Launch(unittest.TestCase):
         f = Fakes([launch.NOT_CLARK])
         self.assertEqual(self.run_launch(f), 1)
         self.assertEqual((f.started, f.windows, f.browser), ([], [], []))
-        self.assertEqual(f.said, ["Nothing was started: clark is already open in another Terminal window, or another program is using the connection it needs. Close that Terminal window, then double-click clark.command again. If that does not help, restart your Mac.\nIf you can't close it, open Terminal in the clark folder and type: "
+        self.assertEqual(f.said, ["Nothing was started: clark is already open in another Terminal window, or another program is using the connection it needs. Close that Terminal window or program, then double-click clark.command again. If that does not help, restart your Mac.\nIf you can't close it, open Terminal in the clark folder and type: "
                                   "./clark.command --port 8801"])
 
     def test_a_port_with_no_easy_free_port_near_it_still_gives_a_way_out(self):
         text = launch.report(launch.NOT_CLARK, 8800, self.folder, free=lambda p: False)
-        self.assertEqual(text, "Nothing was started: clark is already open in another Terminal window, or another program is using the connection it needs. Close that Terminal window, then double-click clark.command again. If that does not help, restart your Mac.")
+        self.assertEqual(text, "Nothing was started: clark is already open in another Terminal window, or another program is using the connection it needs. Close that Terminal window or program, then double-click clark.command again. If that does not help, restart your Mac.")
         text = launch.report(launch.NOT_CLARK, 8800, self.folder, free=lambda p: p == 8801)
-        self.assertEqual(text, "Nothing was started: clark is already open in another Terminal window, or another program is using the connection it needs. Close that Terminal window, then double-click clark.command again. If that does not help, restart your Mac.\n"
+        self.assertEqual(text, "Nothing was started: clark is already open in another Terminal window, or another program is using the connection it needs. Close that Terminal window or program, then double-click clark.command again. If that does not help, restart your Mac.\n"
                                "If you can't close it, open Terminal in the clark folder and type: ./clark.command --port 8801")
         self.assertNotIn("port 8800", text.lower().replace("--port", ""))
 

@@ -66,11 +66,20 @@ def address(port):
     return f"http://127.0.0.1:{port}/"
 
 
+def launcher_file():
+    """The file a person double-clicks to start clark, or None off a Mac (where the name is not known)."""
+    try:
+        return platform.launcher_name()
+    except platform.NotBuiltYet:
+        return None
+
+
 def try_another(port, free=port_free):
     """A second line for a person who can't close the other program: the command with a free number, or "" if none is near."""
     other = free_port_near(port, free)
-    return (f"\nIf you can't close it, open Terminal in the clark folder and type: ./{platform.launcher_name()} --port {other}"
-            if other else "")
+    name = launcher_file()
+    return (f"\nIf you can't close it, open Terminal in the clark folder and type: ./{name} --port {other}"
+            if other and name else "")      # off a Mac there is no launcher file to type
 
 
 def report(kind, port, folder, free=port_free):
@@ -78,8 +87,9 @@ def report(kind, port, folder, free=port_free):
     if kind == OTHER_DATA:
         return (f"Another copy of clark is already open with different data (this one uses {platform.with_tilde(folder)}). "
                 f"Close that copy, then start clark again.{try_another(port, free)}")
+    launcher = launcher_file() or "the clark launcher"          # the launcher file is the Mac's: general words elsewhere
     return ("Nothing was started: clark is already open in another Terminal window, or another program is using the connection it needs. "
-            f"Close that Terminal window, then double-click {platform.launcher_name()} again. If that does not help, restart your Mac.{try_another(port, free)}")
+            f"Close that Terminal window or program, then double-click {launcher} again. If that does not help, restart your Mac.{try_another(port, free)}")
 
 
 def wait_for_clark(port, mark, process, seconds=START_WAIT, health=ask_health, sleep=time.sleep, clock=time.monotonic):
