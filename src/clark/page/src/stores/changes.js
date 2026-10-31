@@ -13,7 +13,18 @@ export const undone = signal(0);
 let counter = 0, tail = Promise.resolve(), timer = 0;
 const itemSteps = new Map();             // the steps that changed a work item (#80 cells, #68 board moves), to what their Undo says ("" for "Undone."): their undo reply has no items, so the data is read again
 
+// #197: the steps the toast offered Undo for, newest last, so Cmd or Ctrl+Z (undoKey.js) undoes the last one even after the toast
+// has gone. Kept in memory only; a step leaves it once it is undone (by the key or the toast's button).
+const undoable = [];
+const MAX_KEPT = 50;
+
 export function say(kind, text, undo = null, code = project.value) {
+  if (undo) {
+    const at = undoable.findIndex((s) => s.step === undo);
+    if (at >= 0) undoable.splice(at, 1);
+    undoable.push({ step: undo, code });
+    if (undoable.length > MAX_KEPT) undoable.shift();
+  }
   clearTimeout(timer);
   const id = ++counter;
   toast.value = { id, kind, text, undo, code };
@@ -92,6 +103,8 @@ export function changeItem(req, done) {
 // some rows were left as they are, the toast says which, in the words clark gives (they name the section and why); otherwise it
 // says what went back (a work item's cell, #80) or that it is undone.
 export function undo(applyId, code = project.value) {
+  const at = undoable.findIndex((s) => s.step === applyId);
+  if (at >= 0) undoable.splice(at, 1);
   return enqueue(async () => {
     const r = await sendUndo(code, applyId);
     if (!r.ok) { say("problem", r.message); return null; }
@@ -138,4 +151,18 @@ export function changeMilestone(req, done) {
     if (r.ok && r.reply.apply_id) say("done", done, r.reply.apply_id, code);
     return r;
   });
+}
+
+// #197: Cmd or Ctrl+Z. Undoes the newest step of the open project that the toast offered Undo for (the same as its button); with none,
+// it says "Nothing to undo." Resolves to the undo's reply, or null.
+export function undoLast(code = project.value) {
+  for (let i = undoable.length - 1; i >= 0; i--) {
+    if (undoable[i].code === code) {
+      const { step } = undoable[i];
+      if (toast.value && toast.value.undo === step) dismiss();
+      return undo(step, code);
+    }
+  }
+  say("note", "Nothing to undo.");
+  return Promise.resolve(null);
 }

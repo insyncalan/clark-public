@@ -149,6 +149,10 @@ MOVE_SQL = (
 OP_MADE = "insert"                    # the log's word for a row a step made; the one place it is spelt, changes.py imports it
 SEED_VIA = "seed"                     # clark (#65): the via of the default sections a step makes (_seed_sections); an Undo never removes them
 PENDING_VIA = "revert:pending"        # an undo's rows until it knows which rows it put back
+BATCH_UNDO = "Undo several"           # #197: the src_ref of a step that undid several steps at once (Store.undo_many)
+MAX_UNDO_MANY = 100                   # #197: the most steps one batch undo takes (the page asks a second time above 25)
+# /api/undo's body is held to 1 KB by server.py: 100 step numbers of up to 7 digits fit; 8-digit numbers over about 100 steps do not
+# (the server refuses the body as too big, in plain words). Raising either limit means raising both.
 REVERT_CREATED = ("actions", "raid", "decisions", "milestones", "use_cases", "links", "item_labels", "labels",
                   "report_sections")
 # a creation of these may be undone. clark: + use cases, and + links and labels, which creaite left to "undo last apply";
@@ -1244,7 +1248,8 @@ def holds(con, table, key, changes):
         return row is None
     if row is None:
         return False
-    return not any(c["field"] in row.keys() and text(row[c["field"]]) != c["new_value"] for c in changes)
+    return not any(c["field"] in row.keys() and c["field"] != "updated_at" and text(row[c["field"]]) != c["new_value"]
+                   for c in changes)      # #197: the stamp follows every change and every undo; the fields say whether it holds
 
 
 def changed_after(con, rowid, table, key, skip=()):
@@ -1256,7 +1261,8 @@ def changed_after(con, rowid, table, key, skip=()):
     gone = reverted_rowids(con)
     for (apply_id, row, via) in con.execute(
             "SELECT c.apply_id, c.rowid, c.via FROM change_log c LEFT JOIN applies a ON a.apply_id = c.apply_id WHERE c.rowid > ? "
-            "AND a.undone_at IS NULL AND ((c.tbl = ? AND c.item_id = ?) OR c.item_id LIKE ?) ORDER BY c.rowid DESC",
+            "AND a.undone_at IS NULL AND c.field != 'updated_at' AND ((c.tbl = ? AND c.item_id = ?) OR c.item_id LIKE ?) "
+            "ORDER BY c.rowid DESC",                    # #197: a stamp is never the later change: a field row always comes with it
             (rowid, table, key, key + "|%")):
         if apply_id not in skip and row not in gone and not str(via).startswith(REVERT_VIA):
             return apply_id
@@ -1360,6 +1366,11 @@ def revert_group(con, apply_id, table, key, rows_, step):
             return [], [entry(x, why="is back already: left as it is", by_step=None) for x in rows_]
         old = json.loads(r["old_value"])
         back = {k: v for k, v in old.items() if k in columns(con, table) and v is not None}
+        before = {}                                    # #197: a field the step changed before the delete goes back to its first old value
+        for x in rows_:
+            if x["rowid"] < r["rowid"] and x["field"] in columns(con, table) and x["field"] not in before:
+                before[x["field"]] = x["old_value"]
+        back.update(_typed(con, table, before))       # a first old value of NULL is put back as NULL, never the column's default
         check_row(con, table, dict(back), set(back))
         _insert_sql(con, table, back)
         for f, v in back.items():
@@ -2081,6 +2092,50 @@ class Store:
                 if undoing_a_revert and done:        # the change this undo reversed is in force again
                     con.execute("UPDATE applies SET undone_at = ? WHERE apply_id = ?", (now(), step_id))
             return {"step_id": new, "reversed": done, "skipped": skipped}
+
+    def undo_many(self, step_ids, by_user, dry=False):
+        """#197: reverse several steps, newest first, as ONE new step (its src_ref is BATCH_UNDO), so one Undo of it puts them all
+        back (Store.undo of a revert step). Returns Store.undo's shape; each entry also says its `step`. A step that is an undo, or
+        that has been undone already, is skipped and named, never refused. Each later step's put-back rows count as gone while an
+        earlier one is judged, so a change and the creation it followed go back together. `dry=True` is the preview: the very same
+        run, always rolled back. A step that isn't there refuses the whole request; nothing is written then."""
+        ids = sorted({int(i) for i in step_ids}, reverse=True)
+        if not ids or len(ids) > MAX_UNDO_MANY:
+            raise Invalid(f"Choose 1 to {MAX_UNDO_MANY} changes to undo.")
+        with self.step("undo", by_user, src_ref=BATCH_UNDO, dry=dry) as st:
+            con, done_all, skipped_all = self.con, [], []
+            st.via = PENDING_VIA
+            for sid in ids:
+                a = con.execute("SELECT undone_at FROM applies WHERE apply_id = ?", (sid,)).fetchone()
+                rows = [dict(r) for r in con.execute("SELECT rowid, * FROM change_log WHERE apply_id = ? ORDER BY rowid", (sid,))]
+                if a is None or not rows:
+                    raise Invalid(f"There's no step {sid} to undo.")
+                real, reverted = [r for r in rows if r["field"] not in ("note", "updated_at") and r["via"] != SEED_VIA], reverted_rowids(con)
+                why = ("is an undo" if all(str(r["via"]).startswith(REVERT_VIA) for r in rows) else
+                       "already undone" if a["undone_at"] or (real and all(r["rowid"] in reverted for r in real)) else None)
+                if why:
+                    done, skipped = [], [{"rowid": r["rowid"], "ref": r["item_id"], "field": r["field"], "why": why, "by_step": None}
+                                         for r in real]
+                else:
+                    done, skipped = revert_plan(con, rows, st, False)
+                tbl = {r["rowid"]: r["tbl"] for r in rows}
+                done_all += [dict(d, step=sid, table=tbl.get(d["rowid"])) for d in done]
+                skipped_all += [dict(x, step=sid, table=tbl.get(x["rowid"])) for x in skipped]
+                if st.peek_apply_id() is not None:      # the rows put back so far count as gone for the older steps still to come
+                    con.execute("UPDATE change_log SET via = ? WHERE apply_id = ? AND via LIKE 'revert:%'",
+                                (REVERT_VIA + ",".join(str(d["rowid"]) for d in done_all), st.peek_apply_id()))
+            return {"step_id": None if dry else st.peek_apply_id(), "reversed": done_all, "skipped": skipped_all}
+
+    def batch_undo_steps(self, apply_id):
+        """#197: the steps a batch undo (Store.undo_many) reversed, oldest first, or None when `apply_id` is not one. Read only."""
+        if not self.con.execute("SELECT 1 FROM item_events WHERE apply_id = ? AND src_ref = ? LIMIT 1", (apply_id, BATCH_UNDO)).fetchone():
+            return None
+        vias = [r[0] for r in self.con.execute("SELECT via FROM change_log WHERE apply_id = ?", (apply_id,))]
+        if not vias or not all(str(v).startswith(REVERT_VIA) for v in vias):
+            return None
+        named = {int(x) for v in vias for x in str(v)[len(REVERT_VIA):].split(",") if x.strip().isdigit()}
+        return sorted({r[0] for n in sorted(named) for r in self.con.execute(
+            "SELECT apply_id FROM change_log WHERE rowid = ?", (n,)) if r[0] is not None})
 
     def step_rows(self, apply_id):
         """What step `apply_id` wrote, read only: [{"table", "key", "field", "via", "op"}], one per change_log row, oldest first; [] for a step

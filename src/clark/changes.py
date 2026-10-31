@@ -1296,6 +1296,8 @@ def _name_use_cases(store, step_rows, names):
 def _do_undo(store, by_user, req):
     if not isinstance(req, dict):
         raise Refused(NOT_JSON_OBJECT)
+    if "steps" in req and "apply_id" not in req:                    # #197: several steps at once
+        return _do_undo_many(store, by_user, req)
     for k in req:
         if k not in ("project", "apply_id"):
             raise Refused(f"clark doesn't know '{_shown(k)}' in that request.")
@@ -1308,8 +1310,8 @@ def _do_undo(store, by_user, req):
     if store.read("projects", ref=project) is None:
         raise Refused(NO_PROJECT, 404, "project_not_found")
     step_rows = store.step_rows(step)
-    if not _eligible(step_rows, project):                           # a missing step, another project's and another route's
-        raise Refused(NO_UNDO)                                      # all say the same: nothing tells which exist
+    if not _eligible(step_rows, project) and not _batch_is_ours(store, step, project):   # a missing step, another project's and
+        raise Refused(NO_UNDO)                                      # another route's all say the same: nothing tells which exist
     names = {r["id"]: r["title"] for r in _sections(store, project)}
     _name_use_cases(store, step_rows, names)                        # #164
     try:                                                            # still inside the caller's one lock
@@ -1353,6 +1355,152 @@ def _do_undo(store, by_user, req):
 
 
 # ── Calls the server makes ────────────────────────────────────────────────────
+
+# ── #197: Undo several ────────────────────────────────────────────────────────
+
+CONFIRM_ABOVE = 25                        # more steps than this need `confirm: true` (the page asks a second time first)
+MANY_NONE = "Choose at least one change to undo."
+MANY_TOO_MANY = f"Choose at most {clark_store.MAX_UNDO_MANY} changes to undo at a time."
+MANY_NOT_MINE = "One of those changes isn't in this project. Reload the page and try again."   # a missing step and another project's: the same words
+MANY_CONFIRM = "Confirm that you want to undo these {n} changes."
+MANY_NOTHING = "None of those changes can be undone."
+MANY_BAD_FLAG = "That must be true or false."
+IS_AN_UNDO = "This is an undo. Undo it on its own."
+UNDONE_ALREADY = "This has been undone already."
+NOT_FROM_HERE = "This change can't be undone from here."
+ARCHIVED_NOW = "It is archived. Restore it first."
+CHANGED_SINCE = "It was changed later, so it is left as it is."
+
+
+def _of_project(key, project):
+    """Whether a change_log key is one of this project's: its code, or an id or a pair that starts with it."""
+    key = str(key)
+    return key == project or key.startswith(project + "-") or key.startswith(project + "|")
+
+
+def _batch_is_ours(store, step, project):
+    """#197: whether `step` is a batch undo (Store.undo_many) of this project's own steps, so the toast's Undo may undo it."""
+    steps = store.batch_undo_steps(step)
+    return bool(steps) and all(_eligible(store.step_rows(s), project) for s in steps)
+
+
+def _many_why(why, by_step):
+    """The store's reason for leaving a change as it is, as a fixed sentence for the preview (no value, no field's text)."""
+    why = str(why or "")
+    if why == NOT_FROM_HERE:
+        return why
+    if why == "is an undo":
+        return IS_AN_UNDO
+    if why == "already undone":
+        return UNDONE_ALREADY
+    if why.endswith("is archived. Restore it first."):
+        return ARCHIVED_NOW
+    if by_step or why.startswith("has changed since"):
+        return CHANGED_SINCE
+    return _skipped_why(why)
+
+
+def _many_field(field):
+    """A field as a person reads it in the preview."""
+    if field is None:
+        return ""
+    return (ITEM_FIELD_NAMES.get(field) or MILESTONE_FIELD_NAMES.get(field) or MILESTONE_KEPT_AS_WAS.get(field)
+            or UC_FIELD_NAMES.get(field) or str(field).replace("_", " "))
+
+
+def _many_entries(entries, skipped):
+    """The preview's lines, newest step first: one per field changed, one per item made or put back whole (never one per column)."""
+    out, seen = [], set()
+    for e in entries:
+        whole = e.get("change") in ("removed", "put back")
+        key = (e["step"], e["ref"], e.get("change") if whole else e["field"])
+        if key in seen:
+            continue
+        seen.add(key)
+        line = {"step": e["step"], "ref": str(e["ref"]), "field": "" if whole else _many_field(e["field"])}
+        if skipped:
+            line["why"] = _many_why(e.get("why"), e.get("by_step"))
+        else:
+            line["change"] = e.get("change") or "set"
+        out.append(line)
+    return out
+
+
+def _many_flag(req, key):
+    value = req.get(key, False)
+    if type(value) is not bool:
+        raise Refused(MANY_BAD_FLAG)
+    return value
+
+
+def _do_undo_many(store, by_user, req):
+    """#197: POST /api/undo with `steps` (the steps of the history rows chosen), `preview` and `confirm`. A preview is the same
+    run rolled back: it lists each change that will be undone and each that will be left, with its reason. Without `preview` one
+    new step undoes them all (newest first), and its Undo puts them all back. A step not of this project refuses the whole request;
+    a step of this project that can't be undone from here is left out and named. The data can change between the preview and the
+    run, so the run's reply is complete on its own: what was undone and what was left, with the reasons, as the preview gives them;
+    the page shows that reply, not the preview it showed before."""
+    for k in req:
+        if k not in ("project", "steps", "preview", "confirm"):
+            raise Refused(f"clark doesn't know '{_shown(k)}' in that request.")
+    project = req.get("project")
+    if not isinstance(project, str) or not re.fullmatch(clark_store.CODE_RE, project):
+        raise Refused(BAD_PROJECT, code="bad_project_code")
+    preview, confirm = _many_flag(req, "preview"), _many_flag(req, "confirm")
+    steps = req.get("steps")
+    if not isinstance(steps, list) or not steps:
+        raise Refused(MANY_NONE)
+    if len(steps) > clark_store.MAX_UNDO_MANY * 2:                  # refused before any is looked at, duplicates or not
+        raise Refused(MANY_TOO_MANY)
+    if any(type(s) is not int or not 1 <= s < 2 ** 63 for s in steps):
+        raise Refused(MANY_NOT_MINE)
+    steps = sorted(set(steps), reverse=True)
+    if len(steps) > clark_store.MAX_UNDO_MANY:
+        raise Refused(MANY_TOO_MANY)
+    if store.read("projects", ref=project) is None:
+        raise Refused(NO_PROJECT, 404, "project_not_found")
+    if len(steps) > CONFIRM_ABOVE and not preview and not confirm:
+        raise Refused(MANY_CONFIRM.format(n=len(steps)), 409, "confirm")
+    left, ours = [], []
+    for s in steps:
+        rows = store.step_rows(s)
+        if not rows or not any(_of_project(r["key"], project) for r in rows):
+            raise Refused(MANY_NOT_MINE)                            # nothing tells a missing step from another project's
+        if all(str(r["via"]).startswith(clark_store.REVERT_VIA) for r in rows):
+            why = "is an undo"
+        elif not _eligible(rows, project):
+            why = NOT_FROM_HERE
+        else:
+            ours.append(s)
+            continue
+        mine = [r for r in rows if _of_project(r["key"], project) and r["field"] not in UNDO_ALSO]
+        left += [{"step": s, "ref": r["key"], "field": None, "why": why, "by_step": None} for r in mine[:1]]
+        # one line for the step, left whole: named by a row of THIS project (never another's), with no field
+    done = {"step_id": None, "reversed": [], "skipped": []}
+    if ours:
+        try:
+            done = store.undo_many(ours, by_user, dry=preview)
+        except Invalid as e:
+            if str(e).startswith("clark's data is in use"):
+                raise Refused(IN_USE, 503, "busy") from None
+            if str(e).startswith("There's no step"):              # gone since it was checked: the same words as a missing one
+                raise Refused(MANY_NOT_MINE) from None
+            raise                                                   # a safety copy that can't be made, in the store's plain words
+    undo = _many_entries(done["reversed"], False)
+    skipped = _many_entries(sorted(left + done["skipped"], key=lambda e: -e["step"]), True)
+    out = {"ok": True, "preview": preview, "apply_id": done["step_id"], "count": len(steps),
+           "needs_confirm": len(steps) > CONFIRM_ABOVE, "undo": undo, "skipped": skipped}
+    if preview:
+        out["words"] = (f"{len(undo)} change{'' if len(undo) == 1 else 's'} will be undone."
+                        + (f" {len(skipped)} will be left as {'it is' if len(skipped) == 1 else 'they are'}." if skipped else ""))
+        return 200, out
+    if done["step_id"] is None:
+        raise Refused(MANY_NOTHING, 409, "not_undoable")
+    out["words"] = (f"Undone: {len(undo)} change{'' if len(undo) == 1 else 's'}."
+                    + (f" {len(skipped)} left as {'it is' if len(skipped) == 1 else 'they are'}." if skipped else ""))
+    out["sections"] = _shown_rows(_sections(store, project))
+    return 200, out
+
 
 def _call(path, onedrive_roots, by_user, work, req):
     """Run `work(store, by_user, req)` on a store of its own, under the one lock; (status, body). A refusal and the
