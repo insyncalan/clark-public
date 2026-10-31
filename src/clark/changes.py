@@ -31,7 +31,7 @@ from clark.store import Invalid
 # The ops, as the request names them. Made from one string, not written one by one: tests/test_store_writer.py reads a lone
 # "update" or "delete" string anywhere in src/ as SQL (its check is case-blind until #39's case-sensitive version merges), and
 # these are not SQL: no op here is ever put in a statement.
-NEW, UPDATE, MOVE, DELETE, ARCHIVE, RESTORE, PICK = "new update move delete archive restore pick".split()
+NEW, UPDATE, MOVE, DELETE, ARCHIVE, RESTORE, PICK, BULK = "new update move delete archive restore pick bulk".split()
 
 # The allow-list: kind -> op -> the fields a request may give (`values` for new, `changes` for update). A field must also
 # be a column of the table (tests/test_changes.py asserts it for each). sort_order, project, id and type (after creation)
@@ -87,6 +87,11 @@ CHANGE_KINDS["actions"][NEW] = ("description", "owner", "priority", "due_date", 
 CHANGE_KINDS["raid"][NEW] = ("type", "description", "owner", "impact", "likelihood", "due_date", "workstream", "milestone")   # raised, status or source
 CHANGE_KINDS["decisions"][NEW] = ("decision", "made_by", "status", "date", "needed_by")      # (clark gives those), and no priority on a risk (worked out)
 CHANGE_KINDS["milestones"][NEW] = ("name", "baseline_date", "owner", "workstream")
+# #196: one field change to several work items of one kind, in one step with one Undo (_do_bulk). A risk's impact and likelihood
+# are here (its priority is worked out from them); a decision takes only who makes it.
+CHANGE_KINDS["actions"][BULK] = ("status", "owner", "due_date", "priority", "workstream", "milestone")
+CHANGE_KINDS["raid"][BULK] = ("status", "owner", "due_date", "impact", "likelihood", "workstream", "milestone")
+CHANGE_KINDS["decisions"][BULK] = ("made_by",)
 for _kind in ARCHIVABLE:                              # #126: every record can be archived and restored, with no fields; the items keep their update
     CHANGE_KINDS.setdefault(_kind, {}).update({ARCHIVE: (), RESTORE: ()})
 ITEM_KINDS = ("actions", "raid", "decisions")        # the work items; every other kind is a report section
@@ -101,8 +106,11 @@ ITEM_SHOWN = {k: ("id",) + tuple(f for f in CHANGE_KINDS[k][UPDATE] if f not in 
 FLAG_FIELDS = ("hidden", "beside")        # 0 or 1 only: a bool, a float, a string or any other number is refused
 BASE_KEYS = ("project", "kind", "op", "place")
 OP_KEYS = {NEW: ("values", "after"), UPDATE: ("id", "changes"), MOVE: ("id", "before", "flags"), DELETE: ("id",),
-           ARCHIVE: ("id",), RESTORE: ("id",), PICK: ("ids",)}
+           ARCHIVE: ("id",), RESTORE: ("id",), PICK: ("ids",), BULK: ("ids", "changes", "confirm")}
 MAX_PICK = 100                            # the picker adds at most this many rows in one step
+MAX_BULK = 500                            # #196: a bulk change names at most this many items (the body limit allows about this many)
+BULK_CONFIRM_ABOVE = 25                   # #196: more items than this need the request's `confirm`, counting every id sent
+BULK_PLACE = "bulk"                       # #196: the store's place for a bulk change ("in the table" in the history)
 MAX_FLAGS = 4                             # a move may set the `beside` of at most this many sections (the moved one, its old partner, its new one, the one before)
 PLACES = tuple(p for p in ("menu", "cell", "report", "board") if p in clark_store.PLACES)   # where the change was made (the step's place); "board" counts once the store knows it
 MOVEMENT_PLACE = "movement"               # #136: a Movement change is written as place "dashboard" with the src_ref "Movement" (no schema change)
@@ -136,6 +144,17 @@ PICK_TOO_MANY = f"Choose at most {MAX_PICK} items at a time."
 PICK_NOT_HIDDEN = "One of those is already on the page. Reload the page and try again."
 PICK_SENSITIVE = "A Sensitive item is never published, so it can't be added to the report."
 PICK_ARCHIVED = "One of those is archived. Restore it first."
+BULK_NOTHING = "Choose at least one item to change."
+BULK_TOO_MANY = f"Choose at most {MAX_BULK} items at a time."
+BULK_KINDS = "These items are of different kinds."
+BULK_PROJECTS = "These items are in different projects."
+BULK_CONFIRM = "Send confirm as true or false."
+BULK_ARCHIVED = "It is archived. Restore it first."
+BULK_DECIDED = "It has been made or withdrawn, so who made it stays as recorded. Record a new decision instead."
+DECIDED = ("Made", "Withdrawn")              # #196: a decision with one of these keeps its `made_by` in a bulk change
+BULK_GONE = "It isn't in this project now. Reload the page."
+BULK_NONE_CAN = "Nothing changed: none of these items can take that change."
+BULK_ALREADY = "Nothing changed: they already have that."
 ITEM_KEEPS_TYPE = "A work item keeps its type."
 NO_ARCHIVE = "An item can't be archived by editing its details. Archiving isn't available from the page yet. Ask the clark team if you need an item hidden now."
 NO_RAID_PRIORITY = "A risk or issue's priority comes from its impact and likelihood. Change those in its details."
@@ -196,9 +215,10 @@ NOT_OPENED = "clark's data could not be opened"
 class Refused(Exception):
     """A request clark won't act on: the status, and the plain words a person reads."""
 
-    def __init__(self, message, status=400, code="refused"):
+    def __init__(self, message, status=400, code="refused", extra=None):
         super().__init__(message)
         self.message, self.status, self.code = message, status, code
+        self.extra = dict(extra or {})          # #196: more for the page (a bulk change's left-out items); never replaces the three
 
 
 def _shown(name):
@@ -247,7 +267,8 @@ def _shape(req):
                 raise Refused(INVALID_LAYOUT)
             raise Refused(f"That change doesn't take '{_shown(k)}'.")
     place = req.get("place")
-    if place is not None and (not isinstance(place, str) or place not in PLACES + ((MOVEMENT_PLACE,) if (kind, op) == ("milestones", UPDATE) else ())):
+    if place is not None and (not isinstance(place, str) or place not in PLACES + ((MOVEMENT_PLACE,) if (kind, op) == ("milestones", UPDATE) else ())
+                              + ((BULK_PLACE,) if op == BULK else ())):
         raise Refused(BAD_PLACE)
     return project, kind, op, place
 
@@ -426,7 +447,7 @@ def _do_change(store, by_user, req):
     if store.read("projects", ref=project) is None:
         raise Refused(NO_PROJECT, 404, "project_not_found")
     table = next(k for k in CHANGE_KINDS if k == kind)              # the allow-list's own spelling, never the request's
-    if (kind == "report_hidden" or (op == NEW and kind in NEWABLE)) and clark_store.is_archived(store.con, project):
+    if (kind == "report_hidden" or op == BULK or (op == NEW and kind in NEWABLE)) and clark_store.is_archived(store.con, project):
         raise Refused(PROJECT_NOT_ACTIVE)                           # #67: an archived project is read only; said alike for show, hide, pick and a new row
     if op in (ARCHIVE, RESTORE):
         return _do_archive(store, by_user, project, table, op, place, req.get("id"))
@@ -435,6 +456,8 @@ def _do_change(store, by_user, req):
         return _do_use_case_change(store, by_user, req, project, table, columns, place)       # is never taken by the work item path
     if op == NEW and kind in NEWABLE:
         return _do_new_row(store, by_user, req, project, table, columns, place)
+    if op == BULK:
+        return _do_bulk(store, by_user, req, project, table, columns, place)
     if kind in ITEM_KINDS:
         return _do_item_change(store, by_user, req, project, table, columns, place)
     if kind == "milestones":
@@ -900,6 +923,108 @@ def _do_pick(store, by_user, req, project, table, place):
     return 200, {"ok": True, "apply_id": apply_id, "added": ids, "shown_to_client": shown, "hidden": _hidden_ids(store, project)}
 
 
+def _bulk_ids(given, project, table):
+    """A bulk change's `ids`: a list of 1 to MAX_BULK work item ids, each of THIS project and of `table`'s kind, duplicates
+    dropped (first kept). Worked out from the id alone, before anything is read, so a refusal tells nothing of what exists."""
+    if not isinstance(given, list) or not given:
+        raise Refused(BULK_NOTHING)
+    if len(given) > MAX_BULK:
+        raise Refused(BULK_TOO_MANY)
+    ids = []
+    for ref in given:
+        m = clark_store.ITEM_ID.fullmatch(ref) if isinstance(ref, str) and ref.isascii() else None      # no other script's digits
+        if m is None:
+            raise Refused(ITEM_NOT_MINE)
+        if m.group(1) != project:
+            raise Refused(BULK_PROJECTS)
+        if clark_store.item_table(ref) != table:
+            raise Refused(BULK_KINDS)
+        if ref not in ids:
+            ids.append(ref)
+    return ids
+
+
+def _bulk_words(changed, unchanged, left_out):
+    """What a bulk change did, for the page's toast: how many changed (or that nothing did), how many had it already, and each
+    item left out and why (at most three named, then a count)."""
+    n = len(changed)
+    lines = [f"Changed {n} item{'' if n == 1 else 's'}."] if n else [BULK_ALREADY]
+    if unchanged and n:
+        lines.append(f"{len(unchanged)} already had that.")
+    for e in left_out[:3]:
+        lines.append(f"Left out {e['id']}: {e['why']}")
+    if len(left_out) > 3:
+        lines.append(f"{len(left_out) - 3} more were left out.")
+    return " ".join(lines)
+
+
+def _do_bulk(store, by_user, req, project, table, columns, place):
+    """#196: the same field change to several work items of one kind in THIS project, in ONE step: one safety copy, one Undo,
+    and each item's fields logged as a single edit logs them (one history line per item and field). Each item is tried first in a
+    step that is always rolled back (dry): an item that can't take the change (archived, gone, or refused by the store's own
+    rules) is left out and named with fixed words, and one that has the change already is counted. Then the rest are written in
+    one step; if any of them is refused there (the data changed in between), that whole step rolls back and nothing is written.
+    Nothing is written when none can take it. More than BULK_CONFIRM_ABOVE ids (every id sent, before any is left out) need
+    `confirm: true`; else the reply asks. Archiving is not a field here: an item is never archived or deleted from a bulk change."""
+    ids = _bulk_ids(req.get("ids"), project, table)
+    changes = _checked_item_changes(_fields(req.get("changes"), table, BULK, columns, "the changes"))
+    if not changes:
+        raise Refused("Say what to change.")
+    for k, v in changes.items():
+        if v is not None and (table, k) in clark_store.ALLOWED and v not in clark_store.ALLOWED[(table, k)]:
+            raise Refused(NOT_A_STATUS if k == "status" else NOT_A_CHOICE)
+    confirm = req.get("confirm", False)
+    if type(confirm) is not bool:
+        raise Refused(BULK_CONFIRM)
+    if len(ids) > BULK_CONFIRM_ABOVE and not confirm:
+        raise Refused(f"Change {len(ids)} items?", 409, "confirm", {"count": len(ids)})
+    where = {"place": place or BULK_PLACE}
+    left_out, unchanged, ready = [], [], []
+    with store.step(VIA, by_user, dry=True, **where) as st:         # always rolled back: only a trial of each item
+        for ref in ids:
+            row = store.read(table, ref=ref)
+            if row is None or row["project"] != project:
+                left_out.append({"id": ref, "why": BULK_GONE})
+                continue
+            if row["archived"]:
+                left_out.append({"id": ref, "why": BULK_ARCHIVED})
+                continue
+            if table == "decisions" and "made_by" in changes and row["status"] in DECIDED:
+                left_out.append({"id": ref, "why": BULK_DECIDED})       # the record of who decided is not rewritten
+                continue
+            try:
+                st.update(table, ref, changes)
+            except Invalid as e:                                    # a rule of the store, in fixed words: no field name, no value
+                words_ = _store_words(e)
+                if words_ is None:
+                    raise
+                left_out.append({"id": ref, "why": words_})
+                continue
+            (unchanged if store.read(table, ref=ref) == row else ready).append(ref)
+    if not ready:
+        if left_out and not unchanged:
+            why = {e["why"] for e in left_out}
+            raise Refused(next(iter(why)) if len(why) == 1 else BULK_NONE_CAN, 400, "none_can", {"left_out": left_out})
+        return 200, {"ok": True, "apply_id": None, "undoable": False, "changed": [], "unchanged": unchanged, "left_out": left_out,
+                     "words": _bulk_words([], unchanged, left_out), "items": []}
+    with store.step(VIA, by_user, **where) as st:                   # BEGIN IMMEDIATE: one step for every item that can take it
+        changed = []
+        for ref in ready:
+            before = store.read(table, ref=ref)
+            try:
+                st.update(table, ref, changes)
+            except Invalid as e:                                    # changed since the trial: the whole step rolls back
+                if _store_words(e) is None:
+                    raise
+                raise Refused(STALE) from None
+            (changed if store.read(table, ref=ref) != before else unchanged).append(ref)    # what was written, not what the trial said
+        apply_id = st.peek_apply_id()
+    shown = tuple(dict.fromkeys(ITEM_SHOWN[table] + CHANGE_KINDS[table][BULK] + (("priority",) if table == "raid" else ())))
+    items = [{k: r[k] for k in shown} for r in (store.read(table, ref=ref) for ref in changed)]
+    return 200, {"ok": True, "apply_id": apply_id, "undoable": apply_id is not None, "changed": changed, "unchanged": unchanged,
+                 "left_out": left_out, "words": _bulk_words(changed, unchanged, left_out), "items": items}
+
+
 def _tiles(store, code):
     """The project's tile rows as shown: by place, then tile."""
     rows = sorted(store.read("glance_tiles", code), key=lambda r: (r["sort_order"], r["tile"]))
@@ -1086,7 +1211,10 @@ def _eligible(rows, project):
         return r["table"] in items and bool(items[r["table"]].fullmatch(str(r["key"]))) and (r["table"], str(r["key"])) not in flagged
 
     def item_field_row(r):
-        return of_item(r) and ((r.get("op") == MADE_OP and r["table"] != "use_cases") or r.get("field") in tuple(CHANGE_KINDS[r["table"]].get(UPDATE, ())) + ("closed", "priority"))
+        if not of_item(r):
+            return False
+        fields = tuple(CHANGE_KINDS[r["table"]].get(UPDATE, ())) + tuple(CHANGE_KINDS[r["table"]].get(BULK, ())) + ("closed", "priority")   # #196: + a bulk change's
+        return (r.get("op") == MADE_OP and r["table"] != "use_cases") or r.get("field") in fields
 
     def item_stamp_row(r):
         return of_item(r) and r.get("field") == "updated_at"
@@ -1114,7 +1242,7 @@ def _eligible(rows, project):
 UC_FIELD_NAMES = {"title": "name", "headline": "headline", "standing": "standing text"}
 ITEM_FIELD_NAMES = {"description": "title", "decision": "title", "status": "status", "workstream": "workstream", "owner": "owner", "priority": "priority",
                     "due_date": "due date", "milestone": "milestone", "made_by": "decider", "needed_by": "needed-by date",
-                    "date": "decision date", "closed": "closing date", "use_case": "use case"}
+                    "date": "decision date", "closed": "closing date", "use_case": "use case", "impact": "impact", "likelihood": "likelihood"}
 UC_REF = re.compile(r"[A-Z][A-Z0-9]{2,6}-U-\d{3}")                  # #164: a use case's id; the words call it by its name
 TILE_REF = re.compile(r"[A-Z][A-Z0-9]{2,6}\|(" + "|".join(TILES) + ")")      # #45: a tile's key
 ITEM_REF = re.compile(r"[A-Z][A-Z0-9]{2,6}-(?:[ADMU]-)?\d{3}")        # a work item's id is what a person calls it
@@ -1378,7 +1506,7 @@ def _call(path, onedrive_roots, by_user, work, req):
             finally:
                 store.close()
     except Refused as r:
-        return r.status, {"ok": False, "message": r.message, "code": r.code}
+        return r.status, {**r.extra, "ok": False, "message": r.message, "code": r.code}
     except Invalid as e:                                            # a store rule, in its plain words
         if str(e).startswith("clark's data is in use"):
             return 503, {"ok": False, "message": IN_USE, "code": "busy"}

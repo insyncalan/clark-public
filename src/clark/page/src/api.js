@@ -60,6 +60,28 @@ export const sendCellChange = (project, table, id, changes, place) =>
 // A board move (#68): `req` is {kind: actions | raid | decisions, op, id, changes, place} as logic/board.js moveFor builds it.
 export const sendItemChange = (project, req) => postItem("/api/change", { ...req, project });
 
+// #196: one change to several work items (op "bulk"). {ok: true, reply} with the changed, unchanged and left-out items, or
+// {ok: false, message, code, leftOut, count}: clark's own fixed refusal is shown as it is (a short plain sentence); `code` is
+// "confirm" when clark asks before more than 25, and "none_can" when none of them can take it.
+export async function sendBulk(project, req) {
+  try {
+    const r = await fetch("/api/change", {
+      method: "POST",
+      headers: { "X-Clark-Token": token(), "Content-Type": "application/json" },
+      body: JSON.stringify({ ...req, project }),
+      cache: "no-store",
+    });
+    const reply = await r.json().catch(() => null);
+    if (r.ok && reply && reply.ok === true && Array.isArray(reply.changed)) return { ok: true, reply };
+    const said = reply && typeof reply.message === "string" ? reply.message : "";
+    const mine = (r.status === 400 || r.status === 409) && said && said.length <= 200 && !/[\u0000-\u001f]/.test(said);
+    return { ok: false, message: mine ? said : plainChange(r.ok ? 500 : r.status, reply), code: reply && typeof reply.code === "string" ? reply.code : "",
+             leftOut: reply && Array.isArray(reply.left_out) ? reply.left_out : [], count: reply && Number.isInteger(reply.count) ? reply.count : 0 };
+  } catch (e) {
+    return { ok: false, message: plainChange(0), code: "", leftOut: [], count: 0 };
+  }
+}
+
 // One change to a milestone from the Movement block (#136), in the Movement place (clark/changes.py). {ok: true, reply} or
 // {ok: false, message, known}: `known` is true when the message is clark's own fixed refusal (shown as it is).
 export async function sendMilestoneChange(project, req) {

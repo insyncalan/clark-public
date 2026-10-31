@@ -7,7 +7,11 @@
 import { signal } from "@preact/signals";
 import { useRef } from "preact/hooks";
 import { data } from "../../stores/report.js";
-import { changeCell } from "../../stores/changes.js";
+import { changeCell, say } from "../../stores/changes.js";
+import { workSelection } from "../../stores/selection.js";
+import { itemRows } from "../../stores/work.js";
+import { cellPlan } from "../bulkLogic.js";
+import { ask, runBulk } from "../Bulk.jsx";
 import { todayIso } from "../../workItems.js";
 import { canPick, changeFor, fieldName, people, statusPill, tableOf, whyFixed } from "../itemEdit.js";
 import { OwnerPick } from "./OwnerPick.jsx";
@@ -40,6 +44,15 @@ export function Cell({ row, field, said, children }) {
   if (field === "status") { const p = statusPill(row); children = <span class={`pill ${p.class}`}>{p.text}</span>; }   // the picker's own word
   const close = (back) => { if (openCell.value === k) openCell.value = ""; if (back && button.current) button.current.focus(); };
   const pick = (value) => {
+    // #196: on a row that is one of two or more selected, the pick changes that field of every selected row, and says so first.
+    const chosen = workSelection.ids.value, plan = chosen.length >= 2 ? cellPlan(row.id, field, itemRows.value.filter((r) => chosen.includes(r.id))) : null;
+    if (plan && plan.why) { if (field === "owner") return plan.why; close(true); say("note", plan.why); return ""; }
+    if (plan) {
+      if (field === "owner" && !String(value == null ? "" : value).trim()) return "An owner can't be blank. Type a name, or TBC if no one is known yet.";
+      close(true);
+      ask(plan.question, () => runBulk(plan.table, plan.ids, plan.id, value, { place: "cell" }));
+      return "";
+    }
     const today = todayIso();
     const c = changeFor(row, field, value, today);
     if (c && c.error) return c.error;

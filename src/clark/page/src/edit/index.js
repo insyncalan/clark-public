@@ -7,6 +7,7 @@ import { Toggle } from "./Toggle.jsx";
 import { Toast } from "./Toast.jsx";
 import { Cell } from "./cells/Cell.jsx";
 import { Board, LayoutSwitch } from "./Board.jsx";
+import { BulkActions, BulkLayer, installBulk } from "./Bulk.jsx";
 import { Publish } from "./Publish.jsx";
 import { ProfileMenu } from "./ProfileMenu.jsx";
 import { Personal } from "./Personal.jsx";
@@ -20,4 +21,4 @@ import { HelpLayer } from "../help/Help.jsx";
 import { installKeys, openHelp, closeHelp, helpOpen } from "../help/helpStore.js";
 
 // Help (#82) is among them: a published file has no Help panel and no "?" key.
-export const EDIT = { glance: GLANCE, Personal, RichField, richOn, Gutter, Add, Title, Toggle, Toast, Cell, Publish, ProfileMenu, ClientFolder, Safety, MilestoneMore: Movement, Board, LayoutSwitch, HelpLayer, help: { open: openHelp, close: closeHelp, isOpen: () => helpOpen.value, installKeys } };
+export const EDIT = { glance: GLANCE, Personal, RichField, richOn, Gutter, Add, Title, Toggle, Toast, Cell, Publish, ProfileMenu, ClientFolder, Safety, MilestoneMore: Movement, Board, LayoutSwitch, Bulk: { Actions: BulkActions, Layer: BulkLayer, install: installBulk }, HelpLayer, help: { open: openHelp, close: closeHelp, isOpen: () => helpOpen.value, installKeys } };

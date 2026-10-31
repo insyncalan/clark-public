@@ -3,7 +3,7 @@
 // the page is what clark saved. A failed change draws nothing and the toast says why, in plain words (api.js).
 import { signal } from "@preact/signals";
 import { data, project, reread } from "./report.js";
-import { sendChange, sendUndo, sendItemChange, sendCellChange, sendMilestoneChange } from "../api.js";
+import { sendChange, sendUndo, sendItemChange, sendCellChange, sendMilestoneChange, sendBulk } from "../api.js";
 
 // null, or { id, kind: "done" | "note" | "problem", text, undo: the step's id or null, code: the project the step was made in }
 export const toast = signal(null);
@@ -136,6 +136,26 @@ export function changeMilestone(req, done) {
   return enqueue(async () => {
     const r = await sendMilestoneChange(code, req);
     if (r.ok && r.reply.apply_id) say("done", done, r.reply.apply_id, code);
+    return r;
+  });
+}
+
+// #196: one change to several work items, in one step with one Undo. The work items are read again after it (and after its Undo),
+// so the page shows what clark saved. Resolves to {ok: true, reply} or {ok: false, code, message, leftOut, count}; a refusal is said
+// in the toast unless it is clark asking before more than 25 (`code` "confirm": the caller asks, then sends again with confirm).
+// `back` is what the toast says after its Undo. Nothing changed (they already had it): the toast says so, with no Undo.
+export function changeBulk(req, back) {
+  const code = project.value;
+  return enqueue(async () => {
+    const r = await sendBulk(code, req);
+    if (!r.ok) {
+      if (r.code !== "confirm") say("note", r.leftOut.length > 1 && r.code === "none_can" ? `${r.message} ${r.leftOut.slice(0, 3).map((e) => `${e.id}: ${e.why}`).join(" ")}` : r.message);
+      return r;
+    }
+    await reread(code);
+    const step = r.reply.undoable === true && r.reply.apply_id ? r.reply.apply_id : null;
+    if (step) itemSteps.set(step, back || "");
+    say(step ? "done" : "note", r.reply.words, step, code);
     return r;
   });
 }
