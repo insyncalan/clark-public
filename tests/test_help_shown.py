@@ -132,8 +132,8 @@ class AgainstThePage(unittest.TestCase):
             self.assertIn(want, absent)
         names = {b for b in re.findall(r"\*\*(.+?)\*\*", everything) if b not in self.HELPCODE}
         # the count falls as features reach the page: 190 bold names, 99 still absent at #147's merge with main, 83 with the section
-        # gutter (#101), whose words Help names (Add a section, the grip ...); lower this only when a feature lands, never to hide a missing one
-        self.assertGreaterEqual(len(names), 83)
+        # gutter (#101), whose words Help names (Add a section, the grip ...), 76 with the AI menu and card (Accept, Discard, Show changes, Improve, Format notes ...); lower this only when a feature lands, never to hide a missing one
+        self.assertGreaterEqual(len(names), 76)
 
     def test_the_shown_keys_are_ones_the_page_answers(self):
         rows = [r[0] for r in SHOWN["reference"]["keys"]]
