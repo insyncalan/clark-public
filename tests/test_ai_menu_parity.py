@@ -15,7 +15,7 @@ CORPUS = json.loads((FIX / "ai-client-parity.json").read_text(encoding="utf-8"))
 
 # Every deliberate difference from creaite, each recorded in docs/REUSE-FROM-CREAITE.md.
 DELIBERATE_OPTION_TEXT = {
-    ("custom", "name"): "Ask…",                       # clark's name for the free-text option (the prototype and DECISIONS 28-10)
+    ("custom", "name"): "Ask…",                       # clark's name for the free-text option (the prototype and the decisions file)
     ("executive", "instruction"): CREAITE["options"]["executive"]["instruction"].replace("voice below", "voice"),   # no style guide
     ("notes", "instruction"): CREAITE["options"]["notes"]["instruction"].replace(" (a Working session note's template)", ""),
 }

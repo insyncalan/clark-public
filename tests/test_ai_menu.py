@@ -9,19 +9,33 @@ Run: python3 dev/run_tests.py test_ai_menu
 Fictional data only.
 """
 import inspect
+import io
 import os
 import re
+import tokenize
 import unittest
 
 from _paths import SRC  # noqa: F401  (puts src/ on the path)
 from clark import ai_menu as am
 from clark.edit_ai import Refused
+from test_no_real_names import banned_in
 
 CANARY = "ZEBRA-CANARY-7731"
 NOTES = "Kick-off on 03-11-2026.\nABC-A-004 is with Mia Hale.\nBudget is 12,500."
 # words a person must not read (RULES: plain words)
 NEVER = re.compile(r"\b(sweep|proposals?|stage[sd]?|appl(?:y|ied|ies)|vault|live server|extract\w*|refus\w*|valid|invalid|tracker|"
                    r"JSON|Traceback|Exception|Error)\b|\.py\b|\w*/\w+\.\w+", re.I)
+
+
+# a date written with digits (any order, any separator), and the first names the tests use for fictional people
+DATE = re.compile(r"\b\d{1,4}[-/.]\d{1,2}[-/.]\d{2,4}\b")
+FIRST_NAMES = re.compile(r"\b(?:Omar|Sam|Mia|Jordan|Sara|Priya)\b")
+
+
+def prose_of(path):
+    """Every comment and every string in a source file, as plain text."""
+    with open(path, "rb") as f:
+        return [t.string for t in tokenize.tokenize(f.readline) if t.type in (tokenize.COMMENT, tokenize.STRING)]
 
 
 class FakeEditor:
@@ -230,7 +244,7 @@ class Reply(unittest.TestCase):
                 r = self.check(reply(rep), place=place)
                 self.assertFalse(r["ok"], (rep, place))
                 self.assertEqual(r["text"], "")
-                self.assertIn("web code", r["message"])
+                self.assertIn("code in it", r["message"])
 
     def test_markup_the_text_already_had_is_not_blamed_on_the_suggestion(self):
         r = self.check(reply("Use <b> for bold, as said."), original="Use <b> for bold.")
@@ -488,6 +502,19 @@ class PlainWords(unittest.TestCase):
             self.assertNotIn("!", s)
             self.assertNotIn("  ", s)
 
+    def test_no_name_or_date_in_what_a_person_reads_or_in_the_code_notes(self):
+        texts = self.strings() + prose_of(am.__file__)
+        for t in texts:
+            self.assertIsNone(DATE.search(t), t)
+            self.assertIsNone(FIRST_NAMES.search(t), t)
+            self.assertFalse(banned_in(t), "a banned name")
+
+    def test_the_name_and_date_check_bites(self):
+        for bad in ("# agreed on 28-10-2026", "# Omar asked for this", "# see 2026/10/28", "\"\"\"Thanks Sam\"\"\""):
+            src = (bad + "\n").encode()
+            texts = [t.string for t in tokenize.tokenize(io.BytesIO(src).readline) if t.type in (tokenize.COMMENT, tokenize.STRING)]
+            self.assertTrue(any(DATE.search(t) or FIRST_NAMES.search(t) for t in texts), bad)
+
     def test_every_message_the_module_can_give_is_plain(self):
         msgs = []
         for call in (lambda: am.build_prompt("rewrite", "", "plain"), lambda: am.build_prompt("rewrite", "x" * 99999, "plain"),
@@ -559,7 +586,7 @@ class WebCodeIsComparedPerMatch(unittest.TestCase):
             for place in ("notes", "plain"):
                 r = self.check(rep, orig, place)
                 self.assertFalse(r["ok"], (rep, orig, place))
-                self.assertIn("web code", r["message"])
+                self.assertIn("code in it", r["message"])
 
     def test_only_tags_the_text_held_are_let_through(self):
         self.assertTrue(self.check("Use <b> for bold, said Alpha.", "Use <b> for bold.")["ok"])
@@ -589,7 +616,7 @@ class LinksAreCheckedToo(unittest.TestCase):
                     "Alpha says [x](#top) [y](/local) the plan.x [z](ftp://evil.example/f)"):
             r = self.check(rep, orig)
             self.assertFalse(r["ok"], rep)
-            self.assertTrue("link" in r["message"] or "web code" in r["message"], rep)
+            self.assertTrue("link" in r["message"] or "code in it" in r["message"], rep)
 
     def test_a_javascript_link_is_not_let_through_because_the_text_named_the_word(self):
         r = self.check("Alpha [x](javascript:alert(1))", "Alpha mentions javascript: as a word")
@@ -618,6 +645,27 @@ class ClientMessageIsCheckedAndBlocks(unittest.TestCase):
 
     def check(self, rep, original=None, place="client_message"):
         return am.check_reply(reply(rep), original or self.ORIG, "rewrite", place)
+
+    def _word_alone_blocks(self, word, sentence):
+        """Each word of the internal-wording list is tested by itself: no other blocking word in the text, so removing the word
+        from the list makes this fail."""
+        self.assertNotIn(word, self.ORIG.lower())
+        r = self.check(sentence)
+        self.assertFalse(r["ok"], sentence)
+        self.assertEqual(r["text"], "")
+        self.assertIn("client", r["message"])
+
+    def test_red_alone_is_not_shown(self):
+        self._word_alone_blocks("red", "We will send the plan by 03-11-2026 and confirm the date with you. This one is red.")
+
+    def test_amber_alone_is_not_shown(self):
+        self._word_alone_blocks("amber", "We will send the plan by 03-11-2026 and confirm the date with you. This one is amber.")
+
+    def test_rag_alone_is_not_shown(self):
+        self._word_alone_blocks("rag", "We will send the plan by 03-11-2026 and confirm the date with you. The rag is noted.")
+
+    def test_do_not_share_alone_is_not_shown(self):
+        self._word_alone_blocks("do not share", "We will send the plan by 03-11-2026 and confirm the date with you. Do not share this.")
 
     def test_the_four_leaks_are_not_shown(self):
         for rep in ("We will send the plan by 03-11-2026. Internally the project is Red because the vendor slipped; Sam Patel is worried.",
@@ -765,7 +813,7 @@ for _name, _sentence in BLOCKED_SPELLINGS.items():
 
 
 class FormatContract(unittest.TestCase):
-    """#72 fix round (the Head's format decision with #66): the AI works on plain text or Markdown; what is accepted goes back
+    """#72 fix round (the decision that the text stays plain or Markdown): the AI works on plain text or Markdown; what is accepted goes back
     through plain_to_html() and the page cleaner."""
 
     def test_plain_to_html_escapes_and_makes_paragraphs_and_lists(self):

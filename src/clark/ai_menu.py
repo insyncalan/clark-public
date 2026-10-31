@@ -279,7 +279,7 @@ def _caps(text, first=False, people=()):
     """The capitalised words of a text that read as names, for the notes under a suggestion: a sentence's first word is skipped
     (it is capitalised anyway). With `first` set, as the client message check sets it, the rule is creaite's, which names only
     people it knows: a capitalised word counts anywhere in a sentence, the first word too, only if it is a known person's name
-    (`people`) or stands in a run of two or more capitalised words ("Omar Reid", "Thanks Sam")."""
+    (`people`) or stands in a run of two or more capitalised words (a first and last name, or "Thanks" and a name)."""
     out, known = set(), _name_words(people)
     for sent in re.split(r"(?<=[.!?:])\s+|\n+", text or ""):
         line = re.sub(r"^[-•*#>\s\[\]x0-9.)]*", "", sent.strip())
@@ -297,7 +297,7 @@ def _caps(text, first=False, people=()):
 
 
 def notes_for(original, suggestion):
-    """BL-106's plain-code check: what a suggestion loses or adds, as [{id, note}] in plain words. Notes only; the user reads the
+    """The plain-code check: what a suggestion loses or adds, as [{id, note}] in plain words. Notes only; the user reads the
     suggestion and decides."""
     out = []
     before, after = _figures(original), _figures(suggestion)
@@ -451,7 +451,7 @@ def check_reply(reply, original, option, place, people=()):
     for pattern in (TAGS, SCRIPTY):             # per match: a reply may hold only the tags and scripts strings the text held
         held = {m.group().strip() for m in pattern.finditer(orig_norm)}
         if any(m.group().strip() not in held for m in pattern.finditer(text_norm)):
-            return _fail("The suggestion had web code in it, so it was not used. Try again.", option)
+            return _fail("The suggestion had hidden code in it, so it was not used. Try again.", option)
     if place == "client_message":
         try:
             problem = _client_problem(text, original, people)
